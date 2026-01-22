@@ -1,4 +1,4 @@
-// Rev 11 – No functional changes; improved diagnostics in index.html.
+// Rev 12 – FIX syntax error, restore execution
 window.__appLoaded = true;
 const els = {
   projectLabel: document.getElementById("projectLabel"),

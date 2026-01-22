@@ -159,7 +159,7 @@
 
     let res, text, ct;
     try {
-      res = await fetch("script.js?v=rev11probe", { cache: "no-store" });
+      res = await fetch("script.js?v=rev12probe", { cache: "no-store" });
       ct = (res.headers.get("content-type") || "").toLowerCase();
       text = await res.text();
     } catch (e) {
@@ -199,6 +199,6 @@
 
   document.addEventListener("DOMContentLoaded", probeScript);
 </script>
-<script defer src="script.js?v=rev11"></script>
+<script defer src="script.js?v=rev12"></script>
 </body>
 </html>
