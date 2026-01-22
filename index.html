@@ -9,7 +9,7 @@
 <body>
   <main class="wrap">
     <header class="header">
-      <div>
+      <div class="headerLeft">
         <h1>Test Entry Log</h1>
         <div class="meta">
           <span>Sync Name:</span>
@@ -17,49 +17,104 @@
           <button id="btnSetProject" class="linkbtn" type="button">Change</button>
         </div>
       </div>
-      <div class="headerActions">
+
+      <div class="headerRight">
         <button id="btnExportCsv" class="ghost" type="button">Export to CSV</button>
       </div>
     </header>
 
     <section class="card">
       <div class="entryRow">
-        <input id="date" type="date" />
-        <input id="foam" type="text" placeholder="Foam" />
-        <input id="fuel" type="text" placeholder="Fuel" />
-        <select id="testType">
-          <option>Sprinkler</option>
-          <option>Type II</option>
-          <option>Type III</option>
-        </select>
-        <input id="airTemp" type="text" inputmode="decimal" placeholder="Air Temp" />
-        <input id="wind" type="text" inputmode="decimal" placeholder="Wind" />
-        <input id="fuelTemp" type="text" inputmode="decimal" placeholder="Fuel Temp" />
-        <input id="solutionTemp" type="text" inputmode="decimal" placeholder="Solution Temp" />
-        <input id="controlTime" type="text" inputmode="numeric" placeholder="0:33" />
-        <input id="extinguishmentTime" type="text" inputmode="numeric" placeholder="1:05" />
+        <div class="field">
+          <div class="lbl">Date</div>
+          <input id="date" type="date" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Foam</div>
+          <input id="foam" type="text" placeholder="Foam" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Fuel</div>
+          <input id="fuel" type="text" placeholder="Fuel" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Test Type</div>
+          <select id="testType">
+            <option value="" selected disabled>Test Type</option>
+            <option value="Sprinkler">Sprinkler</option>
+            <option value="Type II">Type II</option>
+            <option value="Type III">Type III</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="lbl">Air Temp</div>
+          <input id="airTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" placeholder="Air Temp" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Wind</div>
+          <input id="wind" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" placeholder="Wind" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Fuel Temp</div>
+          <input id="fuelTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" placeholder="Fuel Temp" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Solution Temp</div>
+          <input id="solutionTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" placeholder="Solution Temp" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Control Time</div>
+          <input id="controlTime" type="text" inputmode="numeric" pattern="\d{1,2}:\d{2}" placeholder="Control Time" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Extinguishment Time</div>
+          <input id="extinguishmentTime" type="text" inputmode="numeric" pattern="\d{1,2}:\d{2}" placeholder="Extinguishment Time" />
+        </div>
+
         <div class="buttons">
-          <button id="btnSave">Save</button>
-          <button id="btnEdit" disabled>Edit</button>
-          <button id="btnDeleteTop" disabled>Delete</button>
-          <button id="btnClear">Clear</button>
+          <button id="btnSave" type="button">Save</button>
+          <button id="btnEdit" class="ghost" type="button" disabled>Edit</button>
+          <button id="btnDeleteTop" class="danger ghost" type="button" disabled>Delete</button>
+          <button id="btnClear" class="ghost" type="button">Clear</button>
         </div>
       </div>
 
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Date</th><th>Foam</th><th>Fuel</th><th>Test</th>
-            <th>Air</th><th>Wind</th><th>Fuel</th><th>Solution</th>
-            <th>Control</th><th>Ext</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+      <div class="statusRow">
+        <div id="status" class="status" data-error="0">Ready.</div>
+      </div>
 
-      <div id="status" class="status">Ready</div>
+      <div class="tableWrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Foam</th>
+              <th>Fuel</th>
+              <th>Test Type</th>
+              <th>Air Temp</th>
+              <th>Wind</th>
+              <th>Fuel Temp</th>
+              <th>Solution Temp</th>
+              <th>Control Time</th>
+              <th>Extinguishment Time</th>
+              <th class="actionsCol">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
     </section>
   </main>
+
   <script src="script.js"></script>
 </body>
 </html>
