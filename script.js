@@ -1,4 +1,4 @@
-// Rev 14 – Working build (UI + KV + CSV) with correct element IDs, clear status updates
+// Rev 15 – UI polish + input validation + workflow (no export changes)
 window.__appLoaded = true;
 
 const els = {
@@ -34,6 +34,7 @@ let project = localStorage.getItem("kv_project_name") || "";
 let entries = [];
 let selectedId = null;
 let pendingAction = null; // 'save' | 'export' | 'refresh'
+let pendingDelete = { id: null, expires: 0 };
 
 function setStatus(msg, isError=false) {
   els.status.textContent = msg;
@@ -139,6 +140,31 @@ function attachTimeAssist(inputEl) {
 }
 attachTimeAssist(els.controlTime);
 attachTimeAssist(els.extinguishmentTime);
+
+function sanitizeNumberInput(v) {
+  // allow digits, one leading -, one decimal point
+  v = String(v ?? "");
+  // remove invalid chars
+  v = v.replace(/[^0-9.\-]/g, "");
+  // only one leading minus
+  v = v.replace(/(?!^)-/g, "");
+  // only one dot
+  const parts = v.split(".");
+  if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+  return v;
+}
+
+function attachNumberAssist(inputEl) {
+  inputEl.addEventListener("input", () => {
+    inputEl.value = sanitizeNumberInput(inputEl.value);
+  });
+}
+
+attachNumberAssist(els.airTemp);
+attachNumberAssist(els.wind);
+attachNumberAssist(els.fuelTemp);
+attachNumberAssist(els.solutionTemp);
+
 
 function getFormData() {
   return {
@@ -248,6 +274,9 @@ async function saveNewEntry() {
   if (!ensureProject(true, "save")) return;
 
   const entry = getFormData();
+  if (!entry.date) return setStatus("Date is required.", true);
+  if (!entry.foam) return setStatus("Foam is required.", true);
+  if (!entry.fuel) return setStatus("Fuel is required.", true);
   if (!entry.testType) return setStatus("Select Test Type.", true);
 
   if (els.controlTime.value) els.controlTime.value = entry.controlTime || els.controlTime.value;
@@ -255,11 +284,13 @@ async function saveNewEntry() {
 
   try {
     setStatus("Saving…");
-    await api(`/api/entries?project=${encodeURIComponent(project)}`, {
+    const resp = await api(`/api/entries?project=${encodeURIComponent(project)}`, {
       method: "POST",
       body: JSON.stringify({ entry }),
     });
+    const newId = resp?.entry?.id || null;
     await refresh();
+    if (newId) { selectedId = newId; selectRow(newId); }
     clearForm();
     setStatus("Saved.");
   } catch (e) {
@@ -272,6 +303,9 @@ async function updateEntry() {
   if (!selectedId) return;
 
   const entry = getFormData();
+  if (!entry.date) return setStatus("Date is required.", true);
+  if (!entry.foam) return setStatus("Foam is required.", true);
+  if (!entry.fuel) return setStatus("Fuel is required.", true);
   if (!entry.testType) return setStatus("Select Test Type.", true);
 
   try {
@@ -280,7 +314,9 @@ async function updateEntry() {
       method: "PUT",
       body: JSON.stringify({ entry }),
     });
+    const keepId = selectedId;
     await refresh();
+    if (keepId) { selectedId = keepId; selectRow(keepId); }
     clearForm();
     setStatus("Updated.");
   } catch (e) {
@@ -294,8 +330,14 @@ async function deleteEntry(id) {
   const entry = entries.find(x => x.id === id);
   const label = entry ? `${entry.date || "No date"} / ${entry.foam || "Foam"} / ${entry.fuel || "Fuel"}` : id;
 
-  const ok = confirm(`Delete this row?\n${label}`);
-  if (!ok) return;
+  // Delete confirmation (toast-style): press delete twice within five seconds
+  const now = Date.now();
+  if (pendingDelete.id !== id || pendingDelete.expires < now) {
+    pendingDelete = { id, expires: now + 5000 };
+    setStatus(`Confirm delete: press Delete again within five seconds. (${label})`, true);
+    return;
+  }
+  pendingDelete = { id: null, expires: 0 };
 
   try {
     setStatus("Deleting…");
@@ -345,6 +387,27 @@ async function exportCsv() {
     setStatus(e.message, true);
   }
 }
+
+function handleKeyShortcuts(e) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    clearForm();
+    setStatus("Cleared.");
+    return;
+  }
+  if (e.key === "Enter") {
+    // allow dropdown to open/select without saving when focused on select
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+    if (tag === "select") return;
+    e.preventDefault();
+    if (selectedId) return updateEntry();
+    return saveNewEntry();
+  }
+}
+
+// Apply shortcuts to main inputs (not the dialog)
+[els.date, els.foam, els.fuel, els.testType, els.airTemp, els.wind, els.fuelTemp, els.solutionTemp, els.controlTime, els.extinguishmentTime]
+  .forEach(el => el.addEventListener("keydown", handleKeyShortcuts));
 
 // Button wiring
 els.btnSave.addEventListener("click", saveNewEntry);
