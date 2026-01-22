@@ -1,4 +1,4 @@
-// Rev 2 – Fix overlap + make buttons reliably work + NF-Standards-like palette + time auto-format digits -> M:SS
+// Rev 4 – Fix default date on clear, remove placeholders, labels Control/Extinguishment, palette update.
 const els = {
   projectLabel: document.getElementById("projectLabel"),
   btnSetProject: document.getElementById("btnSetProject"),
@@ -130,6 +130,7 @@ function setFormData(d) {
 function clearForm() {
   setFormData({});
   els.testType.value = "";
+  setTodayIfEmpty();
   selectRow(null);
 }
 

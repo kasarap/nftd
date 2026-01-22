@@ -1,14 +1,14 @@
 /* Rev 3 – Fix layout (no weird wraps), strong mobile support, NF-standards-like scheme */
 :root{
-  --bg:#f2f5fb;
+  --bg:#f7f9fc;
   --card:#ffffff;
-  --border:#dfe7f3;
-  --text:#0b1220;
-  --muted:#52607a;
-  --accent:#2b6de9;
-  --accent2:#245ed0;
-  --danger:#c42020;
-  --shadow: 0 12px 34px rgba(10,18,32,.10);
+  --border:#d9e2ef;
+  --text:#111827;
+  --muted:#4b5563;
+  --accent:#1a73e8;
+  --accent2:#1558b0;
+  --danger:#d93025;
+  --shadow: 0 10px 28px rgba(17,24,39,.10);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
@@ -50,7 +50,7 @@ body{ margin:0; background:var(--bg); color:var(--text); }
 .card{
   background:var(--card);
   border:1px solid var(--border);
-  border-radius:18px;
+  border-radius:14px;
   padding:14px;
   box-shadow: var(--shadow);
 }
@@ -73,7 +73,7 @@ input, select{
   font-size:16px;
   padding:11px 12px;
   border:1px solid #c9d6ea;
-  border-radius:12px;
+  border-radius:10px;
   outline:none;
   background:#fff;
   min-width:0;
@@ -93,7 +93,7 @@ input:focus, select:focus{
 
 .btn{
   padding:11px 12px;
-  border-radius:12px;
+  border-radius:10px;
   border:1px solid #c9d6ea;
   background:#fff;
   color:var(--text);
@@ -131,7 +131,6 @@ input:focus, select:focus{
 }
 .table th{
   text-align:left;
-  confirming: none;
   color:var(--muted);
   background:#f8fafc;
   position:sticky;
