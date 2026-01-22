@@ -1,0 +1,1 @@
+alert('KV backend files included in zip; deploy to Cloudflare Pages with Functions enabled.');

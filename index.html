@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Test Entry Log</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="header">
+      <div>
+        <h1>Test Entry Log</h1>
+        <div class="meta">
+          <span>Sync Name:</span>
+          <span id="projectLabel" class="pill">Not set</span>
+          <button id="btnSetProject" class="linkbtn" type="button">Change</button>
+        </div>
+      </div>
+      <div class="headerActions">
+        <button id="btnExportCsv" class="ghost" type="button">Export to CSV</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="entryRow">
+        <input id="date" type="date" />
+        <input id="foam" type="text" placeholder="Foam" />
+        <input id="fuel" type="text" placeholder="Fuel" />
+        <select id="testType">
+          <option>Sprinkler</option>
+          <option>Type II</option>
+          <option>Type III</option>
+        </select>
+        <input id="airTemp" type="text" inputmode="decimal" placeholder="Air Temp" />
+        <input id="wind" type="text" inputmode="decimal" placeholder="Wind" />
+        <input id="fuelTemp" type="text" inputmode="decimal" placeholder="Fuel Temp" />
+        <input id="solutionTemp" type="text" inputmode="decimal" placeholder="Solution Temp" />
+        <input id="controlTime" type="text" inputmode="numeric" placeholder="0:33" />
+        <input id="extinguishmentTime" type="text" inputmode="numeric" placeholder="1:05" />
+        <div class="buttons">
+          <button id="btnSave">Save</button>
+          <button id="btnEdit" disabled>Edit</button>
+          <button id="btnDeleteTop" disabled>Delete</button>
+          <button id="btnClear">Clear</button>
+        </div>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th><th>Foam</th><th>Fuel</th><th>Test</th>
+            <th>Air</th><th>Wind</th><th>Fuel</th><th>Solution</th>
+            <th>Control</th><th>Ext</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+
+      <div id="status" class="status">Ready</div>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
