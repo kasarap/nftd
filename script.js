@@ -1,4 +1,4 @@
-// Rev 4 – Fix default date on clear, remove placeholders, labels Control/Extinguishment, palette update.
+// Rev 5 – Mobile-safe date entry (text-based), auto-format + default today.
 const els = {
   projectLabel: document.getElementById("projectLabel"),
   btnSetProject: document.getElementById("btnSetProject"),
@@ -366,6 +366,8 @@ function setTodayIfEmpty() {
     const dd = String(d.getDate()).padStart(2, "0");
     els.date.value = `${yyyy}-${mm}-${dd}`;
   }
+}-${mm}-${dd}`;
+  }
 }
 
 // Time auto-format: if you type 122 -> 1:22; 33 -> 0:33; 5 -> 0:05; 1234 -> 12:34
@@ -386,6 +388,30 @@ function attachTimeAssist(inputEl) {
 
 attachTimeAssist(els.controlTime);
 attachTimeAssist(els.extinguishmentTime);
+
+function attachDateAssist(inputEl) {
+  inputEl.addEventListener("input", () => {
+    let v = inputEl.value.replace(/[^\d]/g, "");
+    if (v.length > 8) v = v.slice(0, 8);
+
+    if (v.length >= 5 && v.length <= 6) {
+      v = v.slice(0,4) + "-" + v.slice(4);
+    } else if (v.length >= 7) {
+      v = v.slice(0,4) + "-" + v.slice(4,6) + "-" + v.slice(6);
+    }
+    inputEl.value = v;
+  });
+
+  inputEl.addEventListener("blur", () => {
+    const m = inputEl.value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) {
+      setStatus("Date must be YYYY-MM-DD.", true);
+    }
+  });
+}
+
+attachDateAssist(els.date);
+
 
 (async () => {
   renderProject();
