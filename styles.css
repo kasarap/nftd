@@ -175,3 +175,28 @@ tr.selected td{ background: rgba(43,109,233,.06); }
   .buttons{ grid-template-columns: 1fr 1fr; }
   .table{ min-width: 900px; }
 }
+
+
+/* Rev 9 – Always-visible status bar for debugging */
+.statusBar{
+  position: sticky;
+  bottom: 0;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.statusBarInner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  font-size:13px;
+  color:var(--muted);
+}
+.statusDot{
+  width:10px; height:10px; border-radius:999px; background: rgba(43,109,233,.55);
+}
+.statusBar[data-error="1"] .statusDot{ background: rgba(196,32,32,.75); }
+.statusBar[data-error="1"] .statusText{ color: var(--danger); }

@@ -1,4 +1,4 @@
-// Rev 8 – Fix: auto-run after Sync Name (Save/Export), add /api/ping check, better API errors.
+// Rev 9 – Always-visible status + surface JS errors + ping/KV diagnostics.
 const els = {
   projectLabel: document.getElementById("projectLabel"),
   btnSetProject: document.getElementById("btnSetProject"),
@@ -37,8 +37,24 @@ let pendingAction = null; // 'save' | 'export' | 'refresh'
 
 function setStatus(msg, isError = false) {
   els.status.textContent = msg;
-  els.status.dataset.error = isError ? "1" : "0";
+  const bar = document.getElementById("statusBar");
+  if (bar) bar.dataset.error = isError ? "1" : "0";
 }
+
+
+// Surface JS errors to the status bar
+window.addEventListener("error", (e) => {
+  try {
+    console.error(e.error || e);
+    setStatus(`JS error: ${e.message || "unknown"}`, true);
+  } catch {}
+});
+window.addEventListener("unhandledrejection", (e) => {
+  try {
+    console.error(e.reason || e);
+    setStatus(`Promise error: ${String(e.reason || "unknown")}`, true);
+  } catch {}
+});
 
 function sanitizeProjectName(s) {
   if (!s) return "";
@@ -60,7 +76,8 @@ function openSyncDialog(prefill = "") {
     if (p) {
       project = p;
       localStorage.setItem("kv_project_name", project);
-      renderProject();
+      setStatus('App starting…');
+  renderProject();
       refresh();
     }
   }

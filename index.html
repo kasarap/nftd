@@ -88,9 +88,25 @@
         </div>
       </div>
 
-      <div class="statusRow">
-        <div id="status" class="status" data-error="0">Ready.</div>
+      <div id="statusBar" class="statusBar" data-error="0">
+        <div class="statusBarInner">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="statusDot" aria-hidden="true"></span>
+            <span id="status" class="statusText">Loading…</span>
+          </div>
+          <span id="buildTag" class="pill">Rev 9</span>
+        </div>
       </div>
+      <noscript>
+        <div class="statusBar" data-error="1">
+          <div class="statusBarInner">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="statusDot" aria-hidden="true"></span>
+              <span class="statusText">JavaScript is disabled — this page cannot run.</span>
+            </div>
+          </div>
+        </div>
+      </noscript>
 
       <div class="tableWrap">
         <table class="table">
@@ -127,6 +143,18 @@
     </form>
   </dialog>
 
-  <script src="script.js"></script>
+  <script>
+  // Rev 9 inline marker (runs even if script.js fails to load)
+  window.__inlineLoaded = true;
+  document.addEventListener("DOMContentLoaded", () => {
+    const el = document.getElementById("status");
+    const bar = document.getElementById("statusBar");
+    if (el && bar && el.textContent.trim() === "Loading…") {
+      el.textContent = "JS inline loaded. Waiting for app…";
+      bar.dataset.error = "0";
+    }
+  });
+</script>
+<script src="script.js"></script>
 </body>
 </html>
