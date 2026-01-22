@@ -19,12 +19,12 @@
       </div>
 
       <div class="headerRight">
-        <button id="btnExportCsv" class="ghost" type="button">Export to CSV</button>
+        <button id="btnExportCsv" class="btn ghost" type="button">Export to CSV</button>
       </div>
     </header>
 
     <section class="card">
-      <div class="entryRow">
+      <div class="entryRow" id="entryRow">
         <div class="field">
           <div class="lbl">Date</div>
           <input id="date" type="date" />
@@ -72,19 +72,19 @@
 
         <div class="field">
           <div class="lbl">Control Time</div>
-          <input id="controlTime" type="text" inputmode="numeric" pattern="\d{1,2}:\d{2}" placeholder="Control Time" />
+          <input id="controlTime" type="text" inputmode="numeric" placeholder="Control Time" />
         </div>
 
         <div class="field">
           <div class="lbl">Extinguishment Time</div>
-          <input id="extinguishmentTime" type="text" inputmode="numeric" pattern="\d{1,2}:\d{2}" placeholder="Extinguishment Time" />
+          <input id="extinguishmentTime" type="text" inputmode="numeric" placeholder="Extinguishment Time" />
         </div>
 
         <div class="buttons">
-          <button id="btnSave" type="button">Save</button>
-          <button id="btnEdit" class="ghost" type="button" disabled>Edit</button>
-          <button id="btnDeleteTop" class="danger ghost" type="button" disabled>Delete</button>
-          <button id="btnClear" class="ghost" type="button">Clear</button>
+          <button id="btnSave" class="btn primary" type="button">Save</button>
+          <button id="btnEdit" class="btn ghost" type="button" disabled>Edit</button>
+          <button id="btnDeleteTop" class="btn danger ghost" type="button" disabled>Delete</button>
+          <button id="btnClear" class="btn ghost" type="button">Clear</button>
         </div>
       </div>
 
@@ -114,6 +114,19 @@
       </div>
     </section>
   </main>
+
+  <!-- Sync Name dialog (avoids browser prompt blockers) -->
+  <dialog id="syncDialog" class="dialog">
+    <form method="dialog" class="dialogCard">
+      <h2>Set Sync Name</h2>
+      <p>This name is used to sync entries across devices.</p>
+      <input id="syncNameInput" type="text" placeholder="e.g., JLC219AN Jan 21" autocomplete="off" />
+      <div class="dialogBtns">
+        <button id="syncCancel" class="btn ghost" value="cancel" type="submit">Cancel</button>
+        <button id="syncSave" class="btn primary" value="ok" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="script.js"></script>
 </body>

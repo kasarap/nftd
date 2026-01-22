@@ -1,4 +1,4 @@
-// Rev 1 – Fix: Save working (KV API included), center layout, placeholders updated.
+// Rev 2 – Fix overlap + make buttons reliably work + NF-Standards-like palette + time auto-format digits -> M:SS
 const els = {
   projectLabel: document.getElementById("projectLabel"),
   btnSetProject: document.getElementById("btnSetProject"),
@@ -22,6 +22,11 @@ const els = {
 
   tbody: document.getElementById("tbody"),
   status: document.getElementById("status"),
+
+  syncDialog: document.getElementById("syncDialog"),
+  syncNameInput: document.getElementById("syncNameInput"),
+  syncCancel: document.getElementById("syncCancel"),
+  syncSave: document.getElementById("syncSave"),
 };
 
 let project = localStorage.getItem("kv_project_name") || "";
@@ -38,30 +43,60 @@ function sanitizeProjectName(s) {
   return String(s).trim().replace(/\s+/g, " ").slice(0, 80).replace(/[^\w .\-]/g, "");
 }
 
-function ensureProject(promptIfMissing = true) {
-  if (project) return true;
-  if (!promptIfMissing) return false;
-
-  const p = sanitizeProjectName(prompt("Sync Name (this is the shared name used across devices):") || "");
-  if (!p) {
-    setStatus("Sync Name is required to save/sync.", true);
-    return false;
-  }
-  project = p;
-  localStorage.setItem("kv_project_name", project);
-  renderProject();
-  return true;
-}
-
 function renderProject() {
   els.projectLabel.textContent = project || "Not set";
 }
 
-function normalizeTime(s) {
-  const t = String(s).trim();
+function openSyncDialog(prefill = "") {
+  try {
+    els.syncNameInput.value = prefill || project || "";
+    els.syncDialog.showModal();
+    els.syncNameInput.focus();
+  } catch {
+    // Fallback if dialog not supported
+    const p = sanitizeProjectName(prompt("Sync Name (shared name used across devices):", project) || "");
+    if (p) {
+      project = p;
+      localStorage.setItem("kv_project_name", project);
+      renderProject();
+      refresh();
+    }
+  }
+}
+
+function ensureProject(promptIfMissing = true) {
+  if (project) return true;
+  if (!promptIfMissing) return false;
+
+  openSyncDialog("");
+  setStatus("Set Sync Name to save/sync.", true);
+  return false;
+}
+
+function digitsToTime(digits) {
+  const s = String(digits).replace(/\D/g, "");
+  if (!s) return "";
+  if (s.length === 1) return `0:0${s}`;
+  if (s.length === 2) return `0:${s}`;
+  if (s.length === 3) return `${Number(s.slice(0, 1))}:${s.slice(1)}`;
+  // 4+ digits -> take first 2 as minutes, last 2 as seconds
+  const mm = Number(s.slice(0, 2));
+  const ss = s.slice(2, 4);
+  return `${mm}:${ss}`;
+}
+
+function normalizeTime(val) {
+  const raw = String(val ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{1,2}:\d{2}$/.test(raw)) return raw.replace(/^0+(\d)/, "$1");
+  const t = digitsToTime(raw);
   if (!t) return "";
-  const m = t.match(/^(\d{1,2}):([0-5]\d)$/);
-  return m ? `${Number(m[1])}:${m[2]}` : "";
+  // validate seconds 00-59
+  const m = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return "";
+  const sec = Number(m[2]);
+  if (sec > 59) return "";
+  return `${Number(m[1])}:${m[2]}`;
 }
 
 function getFormData() {
@@ -94,7 +129,6 @@ function setFormData(d) {
 
 function clearForm() {
   setFormData({});
-  // reset dropdown placeholder
   els.testType.value = "";
   selectRow(null);
 }
@@ -148,8 +182,8 @@ function renderTable() {
       <td>${escapeHtml(e.extinguishmentTime)}</td>
       <td>
         <div class="rowActions">
-          <button class="ghost" data-act="edit" type="button">Edit</button>
-          <button class="danger ghost" data-act="delete" type="button">Delete</button>
+          <button class="btn ghost" data-act="edit" type="button">Edit</button>
+          <button class="btn danger ghost" data-act="delete" type="button">Delete</button>
         </div>
       </td>
     `;
@@ -195,10 +229,11 @@ async function saveNewEntry() {
   if (!ensureProject(true)) return;
 
   const entry = getFormData();
-  if (!entry.testType) {
-    setStatus("Select Test Type.", true);
-    return;
-  }
+  if (!entry.testType) return setStatus("Select Test Type.", true);
+
+  // If user typed digits, normalize into mm:ss in the UI
+  if (els.controlTime.value) els.controlTime.value = entry.controlTime || els.controlTime.value;
+  if (els.extinguishmentTime.value) els.extinguishmentTime.value = entry.extinguishmentTime || els.extinguishmentTime.value;
 
   try {
     setStatus("Saving…");
@@ -219,10 +254,7 @@ async function updateEntry() {
   if (!selectedId) return;
 
   const entry = getFormData();
-  if (!entry.testType) {
-    setStatus("Select Test Type.", true);
-    return;
-  }
+  if (!entry.testType) return setStatus("Select Test Type.", true);
 
   try {
     setStatus("Updating…");
@@ -303,29 +335,27 @@ async function exportCsv() {
   }
 }
 
+// Button wiring
 els.btnSave.addEventListener("click", saveNewEntry);
 els.btnEdit.addEventListener("click", updateEntry);
-els.btnDeleteTop.addEventListener("click", async () => {
-  if (!selectedId) return;
-  await deleteEntry(selectedId);
-});
-els.btnClear.addEventListener("click", () => {
-  clearForm();
-  setStatus("Cleared.");
-});
+els.btnDeleteTop.addEventListener("click", async () => selectedId && deleteEntry(selectedId));
+els.btnClear.addEventListener("click", () => { clearForm(); setStatus("Cleared."); });
+els.btnExportCsv.addEventListener("click", exportCsv);
+els.btnSetProject.addEventListener("click", () => openSyncDialog(project));
 
-els.btnSetProject.addEventListener("click", async () => {
-  const p = sanitizeProjectName(prompt("Sync Name (shared name used across devices):", project) || "");
-  if (!p) return;
+// Sync dialog behavior
+els.syncDialog.addEventListener("close", async () => {
+  if (els.syncDialog.returnValue !== "ok") return;
+  const p = sanitizeProjectName(els.syncNameInput.value || "");
+  if (!p) return setStatus("Sync Name is required.", true);
+
   project = p;
   localStorage.setItem("kv_project_name", project);
   renderProject();
   clearForm();
   await refresh();
-  setStatus("Sync Name updated.");
+  setStatus("Sync Name set.");
 });
-
-els.btnExportCsv.addEventListener("click", exportCsv);
 
 function setTodayIfEmpty() {
   if (!els.date.value) {
@@ -337,17 +367,19 @@ function setTodayIfEmpty() {
   }
 }
 
+// Time auto-format: if you type 122 -> 1:22; 33 -> 0:33; 5 -> 0:05; 1234 -> 12:34
 function attachTimeAssist(inputEl) {
   inputEl.addEventListener("input", () => {
+    // keep digits and colon while typing
     inputEl.value = inputEl.value.replace(/[^\d:]/g, "").slice(0, 5);
   });
   inputEl.addEventListener("blur", () => {
     const n = normalizeTime(inputEl.value);
     if (inputEl.value && !n) {
-      setStatus("Time must be mm:ss (e.g., 0:33).", true);
-    } else if (n) {
-      inputEl.value = n;
+      setStatus("Time must be mm:ss (e.g., 0:33) or digits (e.g., 122).", true);
+      return;
     }
+    if (n) inputEl.value = n;
   });
 }
 

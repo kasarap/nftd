@@ -1,4 +1,4 @@
-// Rev 1 – KV-backed API for entries (Cloudflare Pages Functions)
+// Rev 2 – KV-backed API for entries (Cloudflare Pages Functions)
 export async function onRequest(context) {
   const { request, env } = context;
   const kv = env.APP_KV;
@@ -117,7 +117,6 @@ function safeStr(v) {
   return String(v).trim();
 }
 
-// allow "", or M:SS / MM:SS
 function safeTime(v) {
   const s = safeStr(v);
   if (!s) return "";
