@@ -144,7 +144,7 @@
   </dialog>
 
   <script>
-  // Rev 10 inline diagnostics
+  // Rev 11 inline diagnostics (content-type + syntax check)
   window.__inlineLoaded = true;
 
   async function probeScript() {
@@ -157,25 +157,48 @@
 
     set("JS inline loaded. Checking script.js…", false);
 
+    let res, text, ct;
     try {
-      const res = await fetch("script.js?v=rev10probe", { cache: "no-store" });
-      if (!res.ok) {
-        set(`script.js not found (HTTP ${res.status}). Check Pages build/output directory.`, true);
-        return;
-      }
-      // If script is present, wait a moment to see if it runs
-      set("script.js found. Waiting for app to start…", false);
-      setTimeout(() => {
-        if (window.__appLoaded) return; // app set it
-        set("script.js exists but did not run. Possible CSP blocking or script load error. Open DevTools → Console/Network.", true);
-      }, 1200);
+      res = await fetch("script.js?v=rev11probe", { cache: "no-store" });
+      ct = (res.headers.get("content-type") || "").toLowerCase();
+      text = await res.text();
     } catch (e) {
       set(`Could not fetch script.js: ${e?.message || e}`, true);
+      return;
     }
+
+    if (!res.ok) {
+      set(`script.js not found (HTTP ${res.status}). Check Pages output directory.`, true);
+      return;
+    }
+
+    const head = (text || "").trim().slice(0, 80).toLowerCase();
+    const looksHtml = head.startsWith("<!doctype") || head.startsWith("<html") || head.startsWith("<head");
+
+    if (looksHtml || (ct && !ct.includes("javascript") && !ct.includes("ecmascript"))) {
+      const ctMsg = ct ? `Content-Type: ${ct}` : "Content-Type missing";
+      set(`script.js is returning HTML or wrong MIME type. ${ctMsg}. Fix Pages output directory / static asset serving.`, true);
+      return;
+    }
+
+    // Syntax check (parse without executing)
+    try {
+      new Function(text);
+    } catch (e) {
+      set(`script.js has a syntax error: ${e?.message || e}`, true);
+      return;
+    }
+
+    set("script.js looks valid. Waiting for app to start…", false);
+
+    setTimeout(() => {
+      if (window.__appLoaded) return;
+      set("script.js fetched OK but did not execute. Check DevTools Console for 'Refused to execute script' or other load errors.", true);
+    }, 1200);
   }
 
   document.addEventListener("DOMContentLoaded", probeScript);
 </script>
-<script defer src="script.js?v=rev10"></script>
+<script defer src="script.js?v=rev11"></script>
 </body>
 </html>

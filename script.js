@@ -1,4 +1,4 @@
-// Rev 10 – Diagnose missing script.js (detect 404/CSP/cache) + set __appLoaded.
+// Rev 11 – No functional changes; improved diagnostics in index.html.
 window.__appLoaded = true;
 const els = {
   projectLabel: document.getElementById("projectLabel"),
