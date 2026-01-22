@@ -1,4 +1,4 @@
-// Rev 7 – Restore calendar date picker + fix save/export routing.
+// Rev 8 – Fix: auto-run after Sync Name (Save/Export), add /api/ping check, better API errors.
 const els = {
   projectLabel: document.getElementById("projectLabel"),
   btnSetProject: document.getElementById("btnSetProject"),
@@ -32,6 +32,8 @@ const els = {
 let project = localStorage.getItem("kv_project_name") || "";
 let entries = [];
 let selectedId = null;
+let pendingAction = null; // 'save' | 'export' | 'refresh'
+
 
 function setStatus(msg, isError = false) {
   els.status.textContent = msg;
@@ -64,13 +66,16 @@ function openSyncDialog(prefill = "") {
   }
 }
 
-function ensureProject(promptIfMissing = true) {
+function ensureProject(promptIfMissing = true, action = null) {
   if (project) return true;
   if (!promptIfMissing) return false;
 
+  pendingAction = action || pendingAction || "refresh";
   openSyncDialog("");
   setStatus("Set Sync Name to save/sync.", true);
   return false;
+}
+
 }
 
 function digitsToTime(digits) {
@@ -139,8 +144,15 @@ async function api(path, opts = {}) {
     headers: { "content-type": "application/json" },
     ...opts,
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
+
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+
+  if (!res.ok) {
+    const msg = data?.error || data?.message || (typeof data?.raw === "string" && data.raw.slice(0, 200)) || "Request failed";
+    throw new Error(`${msg} (HTTP ${res.status})`);
+  }
   return data;
 }
 
@@ -212,7 +224,7 @@ function renderTable() {
 }
 
 async function refresh() {
-  if (!ensureProject(false)) {
+  if (!ensureProject(false, 'refresh')) {
     entries = [];
     renderTable();
     return;
@@ -228,7 +240,7 @@ async function refresh() {
 }
 
 async function saveNewEntry() {
-  if (!ensureProject(true)) return;
+  if (!ensureProject(true, 'save')) return;
 
   const entry = getFormData();
   if (!entry.testType) return setStatus("Select Test Type.", true);
@@ -253,7 +265,7 @@ async function saveNewEntry() {
 }
 
 async function updateEntry() {
-  if (!ensureProject(true)) return;
+  if (!ensureProject(true, 'save')) return;
   if (!selectedId) return;
 
   const entry = getFormData();
@@ -275,7 +287,7 @@ async function updateEntry() {
 }
 
 async function deleteEntry(id) {
-  if (!ensureProject(true)) return;
+  if (!ensureProject(true, 'save')) return;
 
   const entry = entries.find(x => x.id === id);
   const label = entry ? `${entry.date || "No date"} / ${entry.foam || "Foam"} / ${entry.fuel || "Fuel"}` : id;
@@ -319,7 +331,7 @@ function entriesToCsv(rows) {
 }
 
 async function exportCsv() {
-  if (!ensureProject(true)) return;
+  if (!ensureProject(true, 'save')) return;
 
   try {
     setStatus("Exporting…");
@@ -351,13 +363,36 @@ els.btnSetProject.addEventListener("click", () => openSyncDialog(project));
 
 // Sync dialog behavior
 els.syncDialog.addEventListener("close", async () => {
-  if (els.syncDialog.returnValue !== "ok") return;
+  if (els.syncDialog.returnValue !== "ok") {
+    pendingAction = null;
+    return;
+  }
+
   const p = sanitizeProjectName(els.syncNameInput.value || "");
-  if (!p) return setStatus("Sync Name is required.", true);
+  if (!p) {
+    pendingAction = null;
+    return setStatus("Sync Name is required.", true);
+  }
 
   project = p;
   localStorage.setItem("kv_project_name", project);
   renderProject();
+
+  const action = pendingAction;
+  pendingAction = null;
+
+  if (action === "save") {
+    // keep user's current inputs and save immediately
+    await saveNewEntry();
+    return;
+  }
+
+  if (action === "export") {
+    await refresh();
+    await exportCsv();
+    return;
+  }
+
   clearForm();
   await refresh();
   setStatus("Sync Name set.");
