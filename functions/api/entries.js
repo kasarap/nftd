@@ -1,30 +1,18 @@
-// Rev 2 – KV-backed API for entries (Cloudflare Pages Functions)
+// Rev 7 – Fix save routing + keep calendar date input
 export async function onRequest(context) {
   const { request, env } = context;
   const kv = env.APP_KV;
-
   if (!kv) return json({ error: "Missing KV binding APP_KV" }, 500);
 
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
 
-  const isExport = url.pathname.endsWith("/api/entries/export");
-  const isEntries = url.pathname.endsWith("/api/entries");
-
+  // /api/entries  (CRUD)
   const projectRaw = url.searchParams.get("project");
   const project = sanitizeProject(projectRaw);
   if (!project) return json({ error: "Missing or invalid project" }, 400);
 
   const key = `entries:${project}`;
-
-  if (isExport) {
-    if (method !== "GET") return json({ error: "Method not allowed" }, 405);
-    const data = await readProject(kv, key);
-    data.entries.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-    return json({ project, exportedAt: new Date().toISOString(), entries: data.entries });
-  }
-
-  if (!isEntries) return json({ error: "Not found" }, 404);
 
   if (method === "GET") {
     const data = await readProject(kv, key);

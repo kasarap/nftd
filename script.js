@@ -1,4 +1,4 @@
-// Rev 5 – Mobile-safe date entry (text-based), auto-format + default today.
+// Rev 7 – Restore calendar date picker + fix save/export routing.
 const els = {
   projectLabel: document.getElementById("projectLabel"),
   btnSetProject: document.getElementById("btnSetProject"),
@@ -222,6 +222,7 @@ async function refresh() {
     entries = Array.isArray(data.entries) ? data.entries : [];
     renderTable();
   } catch (e) {
+    console.error(e);
     setStatus(e.message, true);
   }
 }
@@ -246,6 +247,7 @@ async function saveNewEntry() {
     clearForm();
     setStatus("Saved.");
   } catch (e) {
+    console.error(e);
     setStatus(e.message, true);
   }
 }
@@ -267,6 +269,7 @@ async function updateEntry() {
     clearForm();
     setStatus("Updated.");
   } catch (e) {
+    console.error(e);
     setStatus(e.message, true);
   }
 }
@@ -290,6 +293,7 @@ async function deleteEntry(id) {
     clearForm();
     setStatus("Deleted.");
   } catch (e) {
+    console.error(e);
     setStatus(e.message, true);
   }
 }
@@ -332,6 +336,7 @@ async function exportCsv() {
 
     setStatus("Exported CSV.");
   } catch (e) {
+    console.error(e);
     setStatus(e.message, true);
   }
 }
@@ -389,28 +394,6 @@ function attachTimeAssist(inputEl) {
 attachTimeAssist(els.controlTime);
 attachTimeAssist(els.extinguishmentTime);
 
-function attachDateAssist(inputEl) {
-  inputEl.addEventListener("input", () => {
-    let v = inputEl.value.replace(/[^\d]/g, "");
-    if (v.length > 8) v = v.slice(0, 8);
-
-    if (v.length >= 5 && v.length <= 6) {
-      v = v.slice(0,4) + "-" + v.slice(4);
-    } else if (v.length >= 7) {
-      v = v.slice(0,4) + "-" + v.slice(4,6) + "-" + v.slice(6);
-    }
-    inputEl.value = v;
-  });
-
-  inputEl.addEventListener("blur", () => {
-    const m = inputEl.value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) {
-      setStatus("Date must be YYYY-MM-DD.", true);
-    }
-  });
-}
-
-attachDateAssist(els.date);
 
 
 (async () => {
