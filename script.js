@@ -1,4 +1,5 @@
-// Rev 9 – Always-visible status + surface JS errors + ping/KV diagnostics.
+// Rev 10 – Diagnose missing script.js (detect 404/CSP/cache) + set __appLoaded.
+window.__appLoaded = true;
 const els = {
   projectLabel: document.getElementById("projectLabel"),
   btnSetProject: document.getElementById("btnSetProject"),

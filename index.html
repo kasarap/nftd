@@ -144,17 +144,38 @@
   </dialog>
 
   <script>
-  // Rev 9 inline marker (runs even if script.js fails to load)
+  // Rev 10 inline diagnostics
   window.__inlineLoaded = true;
-  document.addEventListener("DOMContentLoaded", () => {
+
+  async function probeScript() {
     const el = document.getElementById("status");
     const bar = document.getElementById("statusBar");
-    if (el && bar && el.textContent.trim() === "Loading…") {
-      el.textContent = "JS inline loaded. Waiting for app…";
-      bar.dataset.error = "0";
+    const set = (msg, err=false) => {
+      if (el) el.textContent = msg;
+      if (bar) bar.dataset.error = err ? "1" : "0";
+    };
+
+    set("JS inline loaded. Checking script.js…", false);
+
+    try {
+      const res = await fetch("script.js?v=rev10probe", { cache: "no-store" });
+      if (!res.ok) {
+        set(`script.js not found (HTTP ${res.status}). Check Pages build/output directory.`, true);
+        return;
+      }
+      // If script is present, wait a moment to see if it runs
+      set("script.js found. Waiting for app to start…", false);
+      setTimeout(() => {
+        if (window.__appLoaded) return; // app set it
+        set("script.js exists but did not run. Possible CSP blocking or script load error. Open DevTools → Console/Network.", true);
+      }, 1200);
+    } catch (e) {
+      set(`Could not fetch script.js: ${e?.message || e}`, true);
     }
-  });
+  }
+
+  document.addEventListener("DOMContentLoaded", probeScript);
 </script>
-<script src="script.js"></script>
+<script defer src="script.js?v=rev10"></script>
 </body>
 </html>
