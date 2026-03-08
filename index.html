@@ -47,6 +47,7 @@
             <option value="Sprinkler">Sprinkler</option>
             <option value="Type II">Type II</option>
             <option value="Type III">Type III</option>
+            <option value="MIL">MIL</option>
           </select>
         </div>
 
@@ -94,7 +95,7 @@
             <span class="statusDot" aria-hidden="true"></span>
             <span id="status" class="statusText">Loading…</span>
           </div>
-          <span class="pill">Rev 15</span>
+          <span class="pill">Rev 16</span>
         </div>
       </div>
 
@@ -103,6 +104,7 @@
           <thead>
             <tr>
               <th>Date</th>
+              <th>Time</th>
               <th>Foam</th>
               <th>Fuel</th>
               <th>Test Type</th>
@@ -118,6 +120,7 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
+      <div id="pagination" class="pagination"></div>
     </section>
   </main>
 
@@ -133,6 +136,6 @@
     </form>
   </dialog>
 
-  <script defer src="script.js?v=rev15"></script>
+  <script defer src="script.js?v=rev16"></script>
 </body>
 </html>

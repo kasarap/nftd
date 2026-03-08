@@ -97,6 +97,7 @@ function normalizeEntry(e) {
     solutionTemp: safeStr(e.solutionTemp),
     controlTime: safeTime(e.controlTime),
     extinguishmentTime: safeTime(e.extinguishmentTime),
+    savedTime: safeStr(e.savedTime),
   };
 }
 

@@ -1,4 +1,4 @@
-// Rev 15 – UI polish + input validation + workflow (no export changes)
+// Rev 16 – Pagination (25/page), saved time column (military), MIL + Sprinkler test types, compact mobile layout
 window.__appLoaded = true;
 
 const els = {
@@ -23,6 +23,7 @@ const els = {
   btnClear: document.getElementById("btnClear"),
 
   tbody: document.getElementById("tbody"),
+  pagination: document.getElementById("pagination"),
   status: document.getElementById("status"),
   statusBar: document.getElementById("statusBar"),
 
@@ -30,11 +31,13 @@ const els = {
   syncNameInput: document.getElementById("syncNameInput"),
 };
 
+const PAGE_SIZE = 25;
+let currentPage = 1;
+
 let project = localStorage.getItem("kv_project_name") || "";
 let entries = [];
 let selectedId = null;
 let pendingAction = null; // 'save' | 'export' | 'refresh'
-let pendingDelete = { id: null, expires: 0 };
 
 function setStatus(msg, isError=false) {
   els.status.textContent = msg;
@@ -95,6 +98,11 @@ function todayISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function nowMilitary() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+
 function setTodayIfEmpty() {
   if (!els.date.value) els.date.value = todayISO();
 }
@@ -141,33 +149,8 @@ function attachTimeAssist(inputEl) {
 attachTimeAssist(els.controlTime);
 attachTimeAssist(els.extinguishmentTime);
 
-function sanitizeNumberInput(v) {
-  // allow digits, one leading -, one decimal point
-  v = String(v ?? "");
-  // remove invalid chars
-  v = v.replace(/[^0-9.\-]/g, "");
-  // only one leading minus
-  v = v.replace(/(?!^)-/g, "");
-  // only one dot
-  const parts = v.split(".");
-  if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
-  return v;
-}
-
-function attachNumberAssist(inputEl) {
-  inputEl.addEventListener("input", () => {
-    inputEl.value = sanitizeNumberInput(inputEl.value);
-  });
-}
-
-attachNumberAssist(els.airTemp);
-attachNumberAssist(els.wind);
-attachNumberAssist(els.fuelTemp);
-attachNumberAssist(els.solutionTemp);
-
-
-function getFormData() {
-  return {
+function getFormData(includeTime = false) {
+  const d = {
     date: els.date.value || "",
     foam: els.foam.value || "",
     fuel: els.fuel.value || "",
@@ -179,6 +162,8 @@ function getFormData() {
     controlTime: normalizeTime(els.controlTime.value || ""),
     extinguishmentTime: normalizeTime(els.extinguishmentTime.value || ""),
   };
+  if (includeTime) d.savedTime = nowMilitary();
+  return d;
 }
 
 function setFormData(d) {
@@ -210,13 +195,56 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
+function renderPagination() {
+  const total = entries.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const pag = els.pagination;
+  if (!pag) return;
+  pag.innerHTML = "";
+  if (totalPages <= 1) return;
+
+  const info = document.createElement("span");
+  info.className = "pagInfo";
+  const start = (currentPage - 1) * PAGE_SIZE + 1;
+  const end = Math.min(currentPage * PAGE_SIZE, total);
+  info.textContent = `${start}–${end} of ${total}`;
+
+  const prev = document.createElement("button");
+  prev.className = "btn ghost pagBtn";
+  prev.type = "button";
+  prev.textContent = "← Prev";
+  prev.disabled = currentPage === 1;
+  prev.addEventListener("click", () => { currentPage--; renderTable(); });
+
+  const next = document.createElement("button");
+  next.className = "btn ghost pagBtn";
+  next.type = "button";
+  next.textContent = "Next →";
+  next.disabled = currentPage === totalPages;
+  next.addEventListener("click", () => { currentPage++; renderTable(); });
+
+  pag.appendChild(prev);
+  pag.appendChild(info);
+  pag.appendChild(next);
+}
+
 function renderTable() {
+  const total = entries.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageEntries = entries.slice(start, start + PAGE_SIZE);
+
   els.tbody.innerHTML = "";
-  for (const e of entries) {
+  for (const e of pageEntries) {
     const tr = document.createElement("tr");
     tr.dataset.id = e.id;
     tr.innerHTML = `
       <td>${escapeHtml(e.date)}</td>
+      <td>${escapeHtml(e.savedTime || "")}</td>
       <td>${escapeHtml(e.foam)}</td>
       <td>${escapeHtml(e.fuel)}</td>
       <td>${escapeHtml(e.testType)}</td>
@@ -229,7 +257,7 @@ function renderTable() {
       <td>
         <div class="rowActions">
           <button class="btn ghost" data-act="edit" type="button">Edit</button>
-          <button class="btn danger ghost" data-act="delete" type="button">Delete</button>
+          <button class="btn danger ghost" data-act="delete" type="button">Del</button>
         </div>
       </td>
     `;
@@ -253,6 +281,7 @@ function renderTable() {
     els.tbody.appendChild(tr);
   }
   selectRow(selectedId);
+  renderPagination();
 }
 
 async function refresh() {
@@ -267,16 +296,14 @@ async function refresh() {
     renderTable();
   } catch (e) {
     setStatus(e.message, true);
+    throw e;
   }
 }
 
 async function saveNewEntry() {
   if (!ensureProject(true, "save")) return;
 
-  const entry = getFormData();
-  if (!entry.date) return setStatus("Date is required.", true);
-  if (!entry.foam) return setStatus("Foam is required.", true);
-  if (!entry.fuel) return setStatus("Fuel is required.", true);
+  const entry = getFormData(true); // capture time
   if (!entry.testType) return setStatus("Select Test Type.", true);
 
   if (els.controlTime.value) els.controlTime.value = entry.controlTime || els.controlTime.value;
@@ -284,13 +311,11 @@ async function saveNewEntry() {
 
   try {
     setStatus("Saving…");
-    const resp = await api(`/api/entries?project=${encodeURIComponent(project)}`, {
+    await api(`/api/entries?project=${encodeURIComponent(project)}`, {
       method: "POST",
       body: JSON.stringify({ entry }),
     });
-    const newId = resp?.entry?.id || null;
     await refresh();
-    if (newId) { selectedId = newId; selectRow(newId); }
     clearForm();
     setStatus("Saved.");
   } catch (e) {
@@ -302,11 +327,12 @@ async function updateEntry() {
   if (!ensureProject(true, "save")) return;
   if (!selectedId) return;
 
-  const entry = getFormData();
-  if (!entry.date) return setStatus("Date is required.", true);
-  if (!entry.foam) return setStatus("Foam is required.", true);
-  if (!entry.fuel) return setStatus("Fuel is required.", true);
+  const entry = getFormData(false); // don't overwrite time on edit
   if (!entry.testType) return setStatus("Select Test Type.", true);
+
+  // preserve original savedTime if present
+  const orig = entries.find(x => x.id === selectedId);
+  if (orig?.savedTime) entry.savedTime = orig.savedTime;
 
   try {
     setStatus("Updating…");
@@ -314,9 +340,7 @@ async function updateEntry() {
       method: "PUT",
       body: JSON.stringify({ entry }),
     });
-    const keepId = selectedId;
     await refresh();
-    if (keepId) { selectedId = keepId; selectRow(keepId); }
     clearForm();
     setStatus("Updated.");
   } catch (e) {
@@ -330,14 +354,8 @@ async function deleteEntry(id) {
   const entry = entries.find(x => x.id === id);
   const label = entry ? `${entry.date || "No date"} / ${entry.foam || "Foam"} / ${entry.fuel || "Fuel"}` : id;
 
-  // Delete confirmation (toast-style): press delete twice within five seconds
-  const now = Date.now();
-  if (pendingDelete.id !== id || pendingDelete.expires < now) {
-    pendingDelete = { id, expires: now + 5000 };
-    setStatus(`Confirm delete: press Delete again within five seconds. (${label})`, true);
-    return;
-  }
-  pendingDelete = { id: null, expires: 0 };
+  const ok = confirm(`Delete this row?\n${label}`);
+  if (!ok) return;
 
   try {
     setStatus("Deleting…");
@@ -358,10 +376,10 @@ function csvCell(v) {
 }
 
 function entriesToCsv(rows) {
-  const headers = ["Date","Foam","Fuel","Test Type","Air Temp","Wind","Fuel Temp","Solution Temp","Control","Extinguishment"];
+  const headers = ["Date","Time","Foam","Fuel","Test Type","Air Temp","Wind","Fuel Temp","Solution Temp","Control","Extinguishment"];
   const lines = [headers.join(",")];
   for (const r of rows) {
-    const vals = [r.date,r.foam,r.fuel,r.testType,r.airTemp,r.wind,r.fuelTemp,r.solutionTemp,r.controlTime,r.extinguishmentTime].map(csvCell);
+    const vals = [r.date,r.savedTime||"",r.foam,r.fuel,r.testType,r.airTemp,r.wind,r.fuelTemp,r.solutionTemp,r.controlTime,r.extinguishmentTime].map(csvCell);
     lines.push(vals.join(","));
   }
   return lines.join("\n");
@@ -387,27 +405,6 @@ async function exportCsv() {
     setStatus(e.message, true);
   }
 }
-
-function handleKeyShortcuts(e) {
-  if (e.key === "Escape") {
-    e.preventDefault();
-    clearForm();
-    setStatus("Cleared.");
-    return;
-  }
-  if (e.key === "Enter") {
-    // allow dropdown to open/select without saving when focused on select
-    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
-    if (tag === "select") return;
-    e.preventDefault();
-    if (selectedId) return updateEntry();
-    return saveNewEntry();
-  }
-}
-
-// Apply shortcuts to main inputs (not the dialog)
-[els.date, els.foam, els.fuel, els.testType, els.airTemp, els.wind, els.fuelTemp, els.solutionTemp, els.controlTime, els.extinguishmentTime]
-  .forEach(el => el.addEventListener("keydown", handleKeyShortcuts));
 
 // Button wiring
 els.btnSave.addEventListener("click", saveNewEntry);
@@ -448,9 +445,16 @@ window.addEventListener("unhandledrejection", (e) => { console.error(e.reason ||
   setTodayIfEmpty();
 
   // API health check
+  let apiOk = true;
   try { await api("/api/ping", { method: "GET" }); }
-  catch (e) { console.error(e); setStatus(`API not reachable: ${e.message}`, true); }
+  catch (e) { console.error(e); apiOk = false; setStatus(`API not reachable: ${e.message}`, true); }
 
-  await refresh();
-  setStatus("Ready.");
+  if (apiOk) {
+    try {
+      await refresh();
+      if (els.statusBar.dataset.error !== "1") setStatus("Ready.");
+    } catch (e) {
+      // error already shown by refresh()
+    }
+  }
 })();
