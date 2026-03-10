@@ -1,4 +1,4 @@
-// Rev 16 – Pagination (25/page), saved time column (military), MIL + Sprinkler test types, compact mobile layout
+// v2 – Ambient Weather temp/wind fetch button, fix btnSave wiring
 window.__appLoaded = true;
 
 const els = {
@@ -17,6 +17,7 @@ const els = {
   controlTime: document.getElementById("controlTime"),
   extinguishmentTime: document.getElementById("extinguishmentTime"),
 
+  btnFetchTemp: document.getElementById("btnFetchTemp"),
   btnSave: document.getElementById("btnSave"),
   btnEdit: document.getElementById("btnEdit"),
   btnDeleteTop: document.getElementById("btnDeleteTop"),
@@ -405,6 +406,60 @@ async function exportCsv() {
     setStatus(e.message, true);
   }
 }
+
+// Ambient Weather – fetch avg air temp over past 10 minutes
+const AW_API_KEY = "dc0e8073e5c54e27bb919e6d37435e3e0cab0f73e98d41bd815b879bf551d5ff";
+const AW_APP_KEY = "0b623f64f3954e4db7f3cb9a5d5ce4f1bac3e8652d2347f5bc2caac1cbf61938";
+const AW_MAC = "24:D7:EB:EB:99:5F";
+
+async function fetchAmbientTemp() {
+  els.btnFetchTemp.disabled = true;
+  setStatus("Fetching weather station data…");
+  try {
+    // Request last 12 readings (each ~5 min apart) to cover at least 10 min
+    const url = `https://rt.ambientweather.net/v1/devices/${encodeURIComponent(AW_MAC)}` +
+      `?apiKey=${AW_API_KEY}&applicationKey=${AW_APP_KEY}&limit=12`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`Ambient Weather API error ${res.status}: ${txt.slice(0, 120)}`);
+    }
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) throw new Error("No data returned from station.");
+
+    // Filter to readings within the last 10 minutes
+    const cutoff = Date.now() - 10 * 60 * 1000;
+    const recent = data.filter(d => {
+      const ts = d.dateutc ?? d.date;
+      return ts && new Date(ts).getTime() >= cutoff;
+    });
+
+    const pool = recent.length > 0 ? recent : [data[0]]; // fallback to most recent
+    const temps = pool.map(d => d.tempf).filter(t => typeof t === "number");
+    if (temps.length === 0) throw new Error("No temperature readings found.");
+
+    const avg = temps.reduce((a, b) => a + b, 0) / temps.length;
+    els.airTemp.value = avg.toFixed(1);
+
+    const winds = pool.map(d => d.windspeedmph).filter(w => typeof w === "number");
+    if (winds.length > 0) {
+      const maxWind = Math.max(...winds);
+      els.wind.value = maxWind.toFixed(1);
+    }
+
+    const label = recent.length > 0
+      ? `Air temp & wind set (avg temp, max wind over last 10 min).`
+      : `Air temp & wind set (most recent reading — no data in last 10 min).`;
+    setStatus(label);
+  } catch (e) {
+    console.error(e);
+    setStatus(`Weather fetch failed: ${e.message}`, true);
+  } finally {
+    els.btnFetchTemp.disabled = false;
+  }
+}
+
+els.btnFetchTemp.addEventListener("click", fetchAmbientTemp);
 
 // Button wiring
 els.btnSave.addEventListener("click", saveNewEntry);

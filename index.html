@@ -53,7 +53,10 @@
 
         <div class="field">
           <div class="lbl">Air Temp</div>
-          <input id="airTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+          <div class="airTempRow">
+            <input id="airTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+            <button id="btnFetchTemp" class="btn ghost tempBtn" type="button" title="Fetch avg air temp from last 10 min">🌡️</button>
+          </div>
         </div>
 
         <div class="field">
@@ -95,7 +98,7 @@
             <span class="statusDot" aria-hidden="true"></span>
             <span id="status" class="statusText">Loading…</span>
           </div>
-          <span class="pill">Rev 16</span>
+          <span class="pill">v2</span>
         </div>
       </div>
 
@@ -136,6 +139,6 @@
     </form>
   </dialog>
 
-  <script defer src="script.js?v=rev16"></script>
+  <script defer src="script.js?v=v2"></script>
 </body>
 </html>
