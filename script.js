@@ -1,4 +1,4 @@
-// v2 – Ambient Weather temp/wind fetch button, fix btnSave wiring
+// v3 – Add Expansion and Drain Time fields; merge weather station (🌡️) from v2
 window.__appLoaded = true;
 
 const els = {
@@ -14,6 +14,8 @@ const els = {
   wind: document.getElementById("wind"),
   fuelTemp: document.getElementById("fuelTemp"),
   solutionTemp: document.getElementById("solutionTemp"),
+  expansion: document.getElementById("expansion"),
+  drainTime: document.getElementById("drainTime"),
   controlTime: document.getElementById("controlTime"),
   extinguishmentTime: document.getElementById("extinguishmentTime"),
 
@@ -147,6 +149,7 @@ function attachTimeAssist(inputEl) {
     if (n) inputEl.value = n;
   });
 }
+attachTimeAssist(els.drainTime);
 attachTimeAssist(els.controlTime);
 attachTimeAssist(els.extinguishmentTime);
 
@@ -160,6 +163,8 @@ function getFormData(includeTime = false) {
     wind: els.wind.value || "",
     fuelTemp: els.fuelTemp.value || "",
     solutionTemp: els.solutionTemp.value || "",
+    expansion: els.expansion.value || "",
+    drainTime: normalizeTime(els.drainTime.value || ""),
     controlTime: normalizeTime(els.controlTime.value || ""),
     extinguishmentTime: normalizeTime(els.extinguishmentTime.value || ""),
   };
@@ -176,6 +181,8 @@ function setFormData(d) {
   els.wind.value = d?.wind || "";
   els.fuelTemp.value = d?.fuelTemp || "";
   els.solutionTemp.value = d?.solutionTemp || "";
+  els.expansion.value = d?.expansion || "";
+  els.drainTime.value = d?.drainTime || "";
   els.controlTime.value = d?.controlTime || "";
   els.extinguishmentTime.value = d?.extinguishmentTime || "";
 }
@@ -253,6 +260,8 @@ function renderTable() {
       <td>${escapeHtml(e.wind)}</td>
       <td>${escapeHtml(e.fuelTemp)}</td>
       <td>${escapeHtml(e.solutionTemp)}</td>
+      <td>${escapeHtml(e.expansion)}</td>
+      <td>${escapeHtml(e.drainTime)}</td>
       <td>${escapeHtml(e.controlTime)}</td>
       <td>${escapeHtml(e.extinguishmentTime)}</td>
       <td>
@@ -304,9 +313,10 @@ async function refresh() {
 async function saveNewEntry() {
   if (!ensureProject(true, "save")) return;
 
-  const entry = getFormData(true); // capture time
+  const entry = getFormData(true);
   if (!entry.testType) return setStatus("Select Test Type.", true);
 
+  if (els.drainTime.value) els.drainTime.value = entry.drainTime || els.drainTime.value;
   if (els.controlTime.value) els.controlTime.value = entry.controlTime || els.controlTime.value;
   if (els.extinguishmentTime.value) els.extinguishmentTime.value = entry.extinguishmentTime || els.extinguishmentTime.value;
 
@@ -328,10 +338,9 @@ async function updateEntry() {
   if (!ensureProject(true, "save")) return;
   if (!selectedId) return;
 
-  const entry = getFormData(false); // don't overwrite time on edit
+  const entry = getFormData(false);
   if (!entry.testType) return setStatus("Select Test Type.", true);
 
-  // preserve original savedTime if present
   const orig = entries.find(x => x.id === selectedId);
   if (orig?.savedTime) entry.savedTime = orig.savedTime;
 
@@ -377,10 +386,10 @@ function csvCell(v) {
 }
 
 function entriesToCsv(rows) {
-  const headers = ["Date","Time","Foam","Fuel","Test Type","Air Temp","Wind","Fuel Temp","Solution Temp","Control","Extinguishment"];
+  const headers = ["Date","Time","Foam","Fuel","Test Type","Air Temp","Wind","Fuel Temp","Solution Temp","Expansion","Drain Time","Control","Extinguishment"];
   const lines = [headers.join(",")];
   for (const r of rows) {
-    const vals = [r.date,r.savedTime||"",r.foam,r.fuel,r.testType,r.airTemp,r.wind,r.fuelTemp,r.solutionTemp,r.controlTime,r.extinguishmentTime].map(csvCell);
+    const vals = [r.date,r.savedTime||"",r.foam,r.fuel,r.testType,r.airTemp,r.wind,r.fuelTemp,r.solutionTemp,r.expansion||"",r.drainTime||"",r.controlTime,r.extinguishmentTime].map(csvCell);
     lines.push(vals.join(","));
   }
   return lines.join("\n");
@@ -416,7 +425,6 @@ async function fetchAmbientTemp() {
   els.btnFetchTemp.disabled = true;
   setStatus("Fetching weather station data…");
   try {
-    // Request last 12 readings (each ~5 min apart) to cover at least 10 min
     const url = `https://rt.ambientweather.net/v1/devices/${encodeURIComponent(AW_MAC)}` +
       `?apiKey=${AW_API_KEY}&applicationKey=${AW_APP_KEY}&limit=12`;
     const res = await fetch(url);
@@ -427,14 +435,13 @@ async function fetchAmbientTemp() {
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) throw new Error("No data returned from station.");
 
-    // Filter to readings within the last 10 minutes
     const cutoff = Date.now() - 10 * 60 * 1000;
     const recent = data.filter(d => {
       const ts = d.dateutc ?? d.date;
       return ts && new Date(ts).getTime() >= cutoff;
     });
 
-    const pool = recent.length > 0 ? recent : [data[0]]; // fallback to most recent
+    const pool = recent.length > 0 ? recent : [data[0]];
     const temps = pool.map(d => d.tempf).filter(t => typeof t === "number");
     if (temps.length === 0) throw new Error("No temperature readings found.");
 
@@ -499,7 +506,6 @@ window.addEventListener("unhandledrejection", (e) => { console.error(e.reason ||
   renderProject();
   setTodayIfEmpty();
 
-  // API health check
   let apiOk = true;
   try { await api("/api/ping", { method: "GET" }); }
   catch (e) { console.error(e); apiOk = false; setStatus(`API not reachable: ${e.message}`, true); }

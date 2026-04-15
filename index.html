@@ -75,6 +75,16 @@
         </div>
 
         <div class="field">
+          <div class="lbl">Expansion</div>
+          <input id="expansion" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Drain Time</div>
+          <input id="drainTime" type="text" inputmode="numeric" />
+        </div>
+
+        <div class="field">
           <div class="lbl">Control</div>
           <input id="controlTime" type="text" inputmode="numeric" />
         </div>
@@ -98,7 +108,7 @@
             <span class="statusDot" aria-hidden="true"></span>
             <span id="status" class="statusText">Loading…</span>
           </div>
-          <span class="pill">v2</span>
+          <span class="pill">v3</span>
         </div>
       </div>
 
@@ -115,6 +125,8 @@
               <th>Wind</th>
               <th>Fuel Temp</th>
               <th>Solution Temp</th>
+              <th>Expansion</th>
+              <th>Drain Time</th>
               <th>Control</th>
               <th>Extinguishment</th>
               <th class="actionsCol">Actions</th>
@@ -139,6 +151,6 @@
     </form>
   </dialog>
 
-  <script defer src="script.js?v=v2"></script>
+  <script defer src="script.js?v=v3"></script>
 </body>
 </html>
