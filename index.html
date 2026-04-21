@@ -94,6 +94,11 @@
           <input id="extinguishmentTime" type="text" inputmode="numeric" />
         </div>
 
+        <div class="field">
+          <div class="lbl">Burnback</div>
+          <input id="burnbackTime" type="text" inputmode="numeric" />
+        </div>
+
         <div class="buttons">
           <button id="btnSave" class="btn primary" type="button">Save</button>
           <button id="btnEdit" class="btn ghost" type="button" disabled>Edit</button>
@@ -108,7 +113,7 @@
             <span class="statusDot" aria-hidden="true"></span>
             <span id="status" class="statusText">Loading…</span>
           </div>
-          <span class="pill">v3</span>
+          <span class="pill">v4</span>
         </div>
       </div>
 
@@ -129,6 +134,7 @@
               <th>Drain Time</th>
               <th>Control</th>
               <th>Extinguishment</th>
+              <th>Burnback</th>
               <th class="actionsCol">Actions</th>
             </tr>
           </thead>
@@ -151,6 +157,6 @@
     </form>
   </dialog>
 
-  <script defer src="script.js?v=v3"></script>
+  <script defer src="script.js?v=v4"></script>
 </body>
 </html>

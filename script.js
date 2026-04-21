@@ -1,4 +1,4 @@
-// v3 – Add Expansion and Drain Time fields; merge weather station (🌡️) from v2
+// v4 – Add Burnback field (mm:ss) after Extinguishment; fix entry grid right-border gap
 window.__appLoaded = true;
 
 const els = {
@@ -18,6 +18,7 @@ const els = {
   drainTime: document.getElementById("drainTime"),
   controlTime: document.getElementById("controlTime"),
   extinguishmentTime: document.getElementById("extinguishmentTime"),
+  burnbackTime: document.getElementById("burnbackTime"),
 
   btnFetchTemp: document.getElementById("btnFetchTemp"),
   btnSave: document.getElementById("btnSave"),
@@ -152,6 +153,7 @@ function attachTimeAssist(inputEl) {
 attachTimeAssist(els.drainTime);
 attachTimeAssist(els.controlTime);
 attachTimeAssist(els.extinguishmentTime);
+attachTimeAssist(els.burnbackTime);
 
 function getFormData(includeTime = false) {
   const d = {
@@ -167,6 +169,7 @@ function getFormData(includeTime = false) {
     drainTime: normalizeTime(els.drainTime.value || ""),
     controlTime: normalizeTime(els.controlTime.value || ""),
     extinguishmentTime: normalizeTime(els.extinguishmentTime.value || ""),
+    burnbackTime: normalizeTime(els.burnbackTime.value || ""),
   };
   if (includeTime) d.savedTime = nowMilitary();
   return d;
@@ -185,6 +188,7 @@ function setFormData(d) {
   els.drainTime.value = d?.drainTime || "";
   els.controlTime.value = d?.controlTime || "";
   els.extinguishmentTime.value = d?.extinguishmentTime || "";
+  els.burnbackTime.value = d?.burnbackTime || "";
 }
 
 function clearForm() {
@@ -264,6 +268,7 @@ function renderTable() {
       <td>${escapeHtml(e.drainTime)}</td>
       <td>${escapeHtml(e.controlTime)}</td>
       <td>${escapeHtml(e.extinguishmentTime)}</td>
+      <td>${escapeHtml(e.burnbackTime)}</td>
       <td>
         <div class="rowActions">
           <button class="btn ghost" data-act="edit" type="button">Edit</button>
@@ -319,6 +324,7 @@ async function saveNewEntry() {
   if (els.drainTime.value) els.drainTime.value = entry.drainTime || els.drainTime.value;
   if (els.controlTime.value) els.controlTime.value = entry.controlTime || els.controlTime.value;
   if (els.extinguishmentTime.value) els.extinguishmentTime.value = entry.extinguishmentTime || els.extinguishmentTime.value;
+  if (els.burnbackTime.value) els.burnbackTime.value = entry.burnbackTime || els.burnbackTime.value;
 
   try {
     setStatus("Saving…");
@@ -386,10 +392,10 @@ function csvCell(v) {
 }
 
 function entriesToCsv(rows) {
-  const headers = ["Date","Time","Foam","Fuel","Test Type","Air Temp","Wind","Fuel Temp","Solution Temp","Expansion","Drain Time","Control","Extinguishment"];
+  const headers = ["Date","Time","Foam","Fuel","Test Type","Air Temp","Wind","Fuel Temp","Solution Temp","Expansion","Drain Time","Control","Extinguishment","Burnback"];
   const lines = [headers.join(",")];
   for (const r of rows) {
-    const vals = [r.date,r.savedTime||"",r.foam,r.fuel,r.testType,r.airTemp,r.wind,r.fuelTemp,r.solutionTemp,r.expansion||"",r.drainTime||"",r.controlTime,r.extinguishmentTime].map(csvCell);
+    const vals = [r.date,r.savedTime||"",r.foam,r.fuel,r.testType,r.airTemp,r.wind,r.fuelTemp,r.solutionTemp,r.expansion||"",r.drainTime||"",r.controlTime,r.extinguishmentTime,r.burnbackTime||""].map(csvCell);
     lines.push(vals.join(","));
   }
   return lines.join("\n");

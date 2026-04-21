@@ -1,4 +1,4 @@
-// Rev 7 – Fix save routing + keep calendar date input
+// v4 – Add expansion, drainTime, burnbackTime to persisted fields
 export async function onRequest(context) {
   const { request, env } = context;
   const kv = env.APP_KV;
@@ -95,8 +95,11 @@ function normalizeEntry(e) {
     wind: safeStr(e.wind),
     fuelTemp: safeStr(e.fuelTemp),
     solutionTemp: safeStr(e.solutionTemp),
+    expansion: safeStr(e.expansion),
+    drainTime: safeTime(e.drainTime),
     controlTime: safeTime(e.controlTime),
     extinguishmentTime: safeTime(e.extinguishmentTime),
+    burnbackTime: safeTime(e.burnbackTime),
     savedTime: safeStr(e.savedTime),
   };
 }

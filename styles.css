@@ -26,7 +26,7 @@ body{ margin:0; background:var(--bg); color:var(--text); }
 
 .entryGrid{
   display:grid;
-  grid-template-columns: repeat(12, minmax(100px, 1fr)) 240px;
+  grid-template-columns: repeat(13, minmax(90px, 1fr)) auto;
   gap:8px;
   align-items:end;
 }
@@ -48,7 +48,7 @@ input, select{
 }
 input:focus, select:focus{ border-color: rgba(26,115,232,.55); box-shadow: 0 0 0 3px rgba(26,115,232,.12); }
 
-.buttons{ display:grid; grid-template-columns: 1fr 1fr; gap:6px; align-self:end; }
+.buttons{ display:grid; grid-template-columns: 1fr 1fr; gap:6px; align-self:end; min-width:220px; }
 
 .btn{
   padding:8px 10px;
@@ -70,7 +70,7 @@ input:focus, select:focus{ border-color: rgba(26,115,232,.55); box-shadow: 0 0 0
 .btn:disabled{ opacity:.45; cursor:not-allowed; }
 
 .tableWrap{ margin-top:10px; overflow-x:auto; border-radius:10px; border:1px solid var(--border); -webkit-overflow-scrolling:touch; }
-.table{ width:100%; border-collapse:collapse; min-width: 1100px; }
+.table{ width:100%; border-collapse:collapse; min-width: 1200px; }
 .table th,.table td{ border-bottom:1px solid #edf1f7; padding:7px 8px; font-size:12px; white-space:nowrap; }
 .table th{ text-align:left; color:var(--muted); background:#f8fafc; position:sticky; top:0; z-index:1; font-size:11px; text-transform:uppercase; letter-spacing:.4px; }
 .actionsCol{ width: 130px; }
@@ -122,7 +122,7 @@ tr.selected td{ background: rgba(26,115,232,.06); }
 .dialogCard p{ margin:0 0 10px; color:var(--muted); font-size:12px; }
 .dialogBtns{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; }
 
-@media (max-width: 1150px){
+@media (max-width: 1400px){
   .entryGrid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .buttons{ grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
@@ -131,7 +131,7 @@ tr.selected td{ background: rgba(26,115,232,.06); }
   .header{ flex-direction:column; align-items:flex-start; gap:6px; }
   .header h1{ font-size:18px; }
   .buttons{ grid-template-columns: 1fr 1fr; }
-  .table{ min-width: 900px; }
+  .table{ min-width: 1000px; }
   input, select{ font-size:16px; padding:9px 10px; }
   .btn{ font-size:14px; padding:10px 10px; }
   .card{ padding:8px; border-radius:10px; }
