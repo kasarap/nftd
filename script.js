@@ -1,4 +1,5 @@
-// v4 – Add Burnback field (mm:ss) after Extinguishment; fix entry grid right-border gap
+// v5 – Add: Edit/Copy/Del row actions (edit preserves scroll), Humidity & Pressure fields pulled from Ambient Weather,
+//        Burnback pass/fail with check/X in table, Notes dialog w/ in-table view button.
 window.__appLoaded = true;
 
 const els = {
@@ -12,6 +13,8 @@ const els = {
   testType: document.getElementById("testType"),
   airTemp: document.getElementById("airTemp"),
   wind: document.getElementById("wind"),
+  humidity: document.getElementById("humidity"),
+  pressure: document.getElementById("pressure"),
   fuelTemp: document.getElementById("fuelTemp"),
   solutionTemp: document.getElementById("solutionTemp"),
   expansion: document.getElementById("expansion"),
@@ -19,6 +22,12 @@ const els = {
   controlTime: document.getElementById("controlTime"),
   extinguishmentTime: document.getElementById("extinguishmentTime"),
   burnbackTime: document.getElementById("burnbackTime"),
+  burnbackPass: document.getElementById("burnbackPass"),
+  burnbackFail: document.getElementById("burnbackFail"),
+  btnClearResult: document.getElementById("btnClearResult"),
+
+  btnNotes: document.getElementById("btnNotes"),
+  notesBtnLabel: document.getElementById("notesBtnLabel"),
 
   btnFetchTemp: document.getElementById("btnFetchTemp"),
   btnSave: document.getElementById("btnSave"),
@@ -33,6 +42,11 @@ const els = {
 
   syncDialog: document.getElementById("syncDialog"),
   syncNameInput: document.getElementById("syncNameInput"),
+
+  notesDialog: document.getElementById("notesDialog"),
+  notesInput: document.getElementById("notesInput"),
+  notesViewDialog: document.getElementById("notesViewDialog"),
+  notesViewBody: document.getElementById("notesViewBody"),
 };
 
 const PAGE_SIZE = 25;
@@ -42,6 +56,9 @@ let project = localStorage.getItem("kv_project_name") || "";
 let entries = [];
 let selectedId = null;
 let pendingAction = null; // 'save' | 'export' | 'refresh'
+
+// Pending notes for the current form (string, persisted on save/update)
+let pendingNotes = "";
 
 function setStatus(msg, isError=false) {
   els.status.textContent = msg;
@@ -155,6 +172,22 @@ attachTimeAssist(els.controlTime);
 attachTimeAssist(els.extinguishmentTime);
 attachTimeAssist(els.burnbackTime);
 
+function getBurnbackResult() {
+  if (els.burnbackPass.checked) return "pass";
+  if (els.burnbackFail.checked) return "fail";
+  return "";
+}
+function setBurnbackResult(v) {
+  els.burnbackPass.checked = v === "pass";
+  els.burnbackFail.checked = v === "fail";
+}
+
+function updateNotesButton() {
+  const hasNotes = !!(pendingNotes && pendingNotes.trim());
+  els.btnNotes.classList.toggle("hasNotes", hasNotes);
+  els.notesBtnLabel.textContent = hasNotes ? "Edit notes" : "Add notes";
+}
+
 function getFormData(includeTime = false) {
   const d = {
     date: els.date.value || "",
@@ -163,6 +196,8 @@ function getFormData(includeTime = false) {
     testType: els.testType.value || "",
     airTemp: els.airTemp.value || "",
     wind: els.wind.value || "",
+    humidity: els.humidity.value || "",
+    pressure: els.pressure.value || "",
     fuelTemp: els.fuelTemp.value || "",
     solutionTemp: els.solutionTemp.value || "",
     expansion: els.expansion.value || "",
@@ -170,6 +205,8 @@ function getFormData(includeTime = false) {
     controlTime: normalizeTime(els.controlTime.value || ""),
     extinguishmentTime: normalizeTime(els.extinguishmentTime.value || ""),
     burnbackTime: normalizeTime(els.burnbackTime.value || ""),
+    burnbackResult: getBurnbackResult(),
+    notes: pendingNotes || "",
   };
   if (includeTime) d.savedTime = nowMilitary();
   return d;
@@ -182,6 +219,8 @@ function setFormData(d) {
   els.testType.value = d?.testType || "";
   els.airTemp.value = d?.airTemp || "";
   els.wind.value = d?.wind || "";
+  els.humidity.value = d?.humidity || "";
+  els.pressure.value = d?.pressure || "";
   els.fuelTemp.value = d?.fuelTemp || "";
   els.solutionTemp.value = d?.solutionTemp || "";
   els.expansion.value = d?.expansion || "";
@@ -189,6 +228,9 @@ function setFormData(d) {
   els.controlTime.value = d?.controlTime || "";
   els.extinguishmentTime.value = d?.extinguishmentTime || "";
   els.burnbackTime.value = d?.burnbackTime || "";
+  setBurnbackResult(d?.burnbackResult || "");
+  pendingNotes = d?.notes || "";
+  updateNotesButton();
 }
 
 function clearForm() {
@@ -196,6 +238,17 @@ function clearForm() {
   els.testType.value = "";
   setTodayIfEmpty();
   selectRow(null);
+}
+
+// Copy entry → new blank form with foam, test type, solution temp pre-filled
+function copyEntry(sourceEntry) {
+  clearForm();
+  els.foam.value = sourceEntry?.foam || "";
+  els.testType.value = sourceEntry?.testType || "";
+  els.solutionTemp.value = sourceEntry?.solutionTemp || "";
+  // Ensure we're creating a new entry, not editing
+  selectRow(null);
+  setStatus("Copied Foam, Test Type, and Solution Temp. Ready for new entry.");
 }
 
 function escapeHtml(s) {
@@ -242,7 +295,25 @@ function renderPagination() {
   pag.appendChild(next);
 }
 
-function renderTable() {
+function resultCell(r) {
+  if (r === "pass") return `<span class="resultIcon pass" title="Pass">✓</span>`;
+  if (r === "fail") return `<span class="resultIcon fail" title="Fail">✕</span>`;
+  return `<span class="notesCellEmpty">—</span>`;
+}
+
+function notesCell(e) {
+  const has = !!(e.notes && e.notes.trim());
+  if (has) {
+    return `<button class="notesCellBtn hasNotes" data-act="viewNotes" type="button" title="View notes">📝 View</button>`;
+  }
+  return `<span class="notesCellEmpty">—</span>`;
+}
+
+function renderTable(preserveScroll = false) {
+  const tableWrap = document.querySelector(".tableWrap");
+  const scrollX = tableWrap ? tableWrap.scrollLeft : 0;
+  const scrollY = window.scrollY;
+
   const total = entries.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (currentPage > totalPages) currentPage = totalPages;
@@ -262,6 +333,8 @@ function renderTable() {
       <td>${escapeHtml(e.testType)}</td>
       <td>${escapeHtml(e.airTemp)}</td>
       <td>${escapeHtml(e.wind)}</td>
+      <td>${escapeHtml(e.humidity)}</td>
+      <td>${escapeHtml(e.pressure)}</td>
       <td>${escapeHtml(e.fuelTemp)}</td>
       <td>${escapeHtml(e.solutionTemp)}</td>
       <td>${escapeHtml(e.expansion)}</td>
@@ -269,9 +342,12 @@ function renderTable() {
       <td>${escapeHtml(e.controlTime)}</td>
       <td>${escapeHtml(e.extinguishmentTime)}</td>
       <td>${escapeHtml(e.burnbackTime)}</td>
+      <td>${resultCell(e.burnbackResult || "")}</td>
+      <td>${notesCell(e)}</td>
       <td>
         <div class="rowActions">
           <button class="btn ghost" data-act="edit" type="button">Edit</button>
+          <button class="btn ghost" data-act="copy" type="button">Copy</button>
           <button class="btn danger ghost" data-act="delete" type="button">Del</button>
         </div>
       </td>
@@ -283,32 +359,68 @@ function renderTable() {
       selectRow(e.id);
     });
 
-    tr.querySelector('[data-act="edit"]').addEventListener("click", () => {
+    tr.querySelector('[data-act="edit"]').addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      // Preserve scroll position when loading row into form
+      const savedScrollY = window.scrollY;
+      const savedScrollX = tableWrap ? tableWrap.scrollLeft : 0;
       setFormData(e);
       selectRow(e.id);
+      // Restore scroll on next frame (after any focus/reflow). Two-arg scrollTo is always instant.
+      requestAnimationFrame(() => {
+        window.scrollTo(0, savedScrollY);
+        if (tableWrap) tableWrap.scrollLeft = savedScrollX;
+      });
       setStatus("Loaded row for editing.");
     });
 
-    tr.querySelector('[data-act="delete"]').addEventListener("click", async () => {
+    tr.querySelector('[data-act="copy"]').addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const savedScrollY = window.scrollY;
+      const savedScrollX = tableWrap ? tableWrap.scrollLeft : 0;
+      copyEntry(e);
+      requestAnimationFrame(() => {
+        window.scrollTo(0, savedScrollY);
+        if (tableWrap) tableWrap.scrollLeft = savedScrollX;
+      });
+    });
+
+    tr.querySelector('[data-act="delete"]').addEventListener("click", async (ev) => {
+      ev.stopPropagation();
       await deleteEntry(e.id);
     });
+
+    const viewNotesBtn = tr.querySelector('[data-act="viewNotes"]');
+    if (viewNotesBtn) {
+      viewNotesBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        openNotesViewer(e);
+      });
+    }
 
     els.tbody.appendChild(tr);
   }
   selectRow(selectedId);
   renderPagination();
+
+  if (preserveScroll) {
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
+      if (tableWrap) tableWrap.scrollLeft = scrollX;
+    });
+  }
 }
 
-async function refresh() {
+async function refresh(preserveScroll = false) {
   if (!ensureProject(false, "refresh")) {
     entries = [];
-    renderTable();
+    renderTable(preserveScroll);
     return;
   }
   try {
     const data = await api(`/api/entries?project=${encodeURIComponent(project)}`);
     entries = Array.isArray(data.entries) ? data.entries : [];
-    renderTable();
+    renderTable(preserveScroll);
   } catch (e) {
     setStatus(e.message, true);
     throw e;
@@ -356,7 +468,8 @@ async function updateEntry() {
       method: "PUT",
       body: JSON.stringify({ entry }),
     });
-    await refresh();
+    // preserve scroll so the user doesn't lose their place in the table
+    await refresh(true);
     clearForm();
     setStatus("Updated.");
   } catch (e) {
@@ -377,14 +490,30 @@ async function deleteEntry(id) {
     setStatus("Deleting…");
     await api(`/api/entries?project=${encodeURIComponent(project)}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
     if (selectedId === id) selectedId = null;
-    await refresh();
-    clearForm();
+    await refresh(true);
+    if (selectedId === null) clearForm();
     setStatus("Deleted.");
   } catch (e) {
     setStatus(e.message, true);
   }
 }
 
+// Notes dialogs
+function openNotesEditor() {
+  els.notesInput.value = pendingNotes || "";
+  els.notesDialog.showModal();
+  // Move cursor to end
+  const val = els.notesInput.value;
+  els.notesInput.focus();
+  els.notesInput.setSelectionRange(val.length, val.length);
+}
+
+function openNotesViewer(entry) {
+  els.notesViewBody.textContent = entry.notes || "";
+  els.notesViewDialog.showModal();
+}
+
+// CSV Export
 function csvCell(v) {
   const s = String(v ?? "");
   if (/[",\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
@@ -392,10 +521,21 @@ function csvCell(v) {
 }
 
 function entriesToCsv(rows) {
-  const headers = ["Date","Time","Foam","Fuel","Test Type","Air Temp","Wind","Fuel Temp","Solution Temp","Expansion","Drain Time","Control","Extinguishment","Burnback"];
+  const headers = [
+    "Date","Time","Foam","Fuel","Test Type",
+    "Air Temp","Wind","Humidity","Pressure",
+    "Fuel Temp","Solution Temp","Expansion",
+    "Drain Time","Control","Extinguishment","Burnback","Result","Notes"
+  ];
   const lines = [headers.join(",")];
   for (const r of rows) {
-    const vals = [r.date,r.savedTime||"",r.foam,r.fuel,r.testType,r.airTemp,r.wind,r.fuelTemp,r.solutionTemp,r.expansion||"",r.drainTime||"",r.controlTime,r.extinguishmentTime,r.burnbackTime||""].map(csvCell);
+    const vals = [
+      r.date, r.savedTime||"", r.foam, r.fuel, r.testType,
+      r.airTemp, r.wind, r.humidity||"", r.pressure||"",
+      r.fuelTemp, r.solutionTemp, r.expansion||"",
+      r.drainTime||"", r.controlTime, r.extinguishmentTime, r.burnbackTime||"",
+      r.burnbackResult||"", r.notes||""
+    ].map(csvCell);
     lines.push(vals.join(","));
   }
   return lines.join("\n");
@@ -422,7 +562,7 @@ async function exportCsv() {
   }
 }
 
-// Ambient Weather – fetch avg air temp over past 10 minutes
+// Ambient Weather – fetch avg air temp, max wind, avg humidity & pressure over past 10 minutes
 const AW_API_KEY = "dc0e8073e5c54e27bb919e6d37435e3e0cab0f73e98d41bd815b879bf551d5ff";
 const AW_APP_KEY = "0b623f64f3954e4db7f3cb9a5d5ce4f1bac3e8652d2347f5bc2caac1cbf61938";
 const AW_MAC = "24:D7:EB:EB:99:5F";
@@ -448,21 +588,39 @@ async function fetchAmbientTemp() {
     });
 
     const pool = recent.length > 0 ? recent : [data[0]];
+
+    // Temperature — avg
     const temps = pool.map(d => d.tempf).filter(t => typeof t === "number");
     if (temps.length === 0) throw new Error("No temperature readings found.");
+    const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
+    els.airTemp.value = avgTemp.toFixed(1);
 
-    const avg = temps.reduce((a, b) => a + b, 0) / temps.length;
-    els.airTemp.value = avg.toFixed(1);
-
+    // Wind — max
     const winds = pool.map(d => d.windspeedmph).filter(w => typeof w === "number");
     if (winds.length > 0) {
       const maxWind = Math.max(...winds);
       els.wind.value = maxWind.toFixed(1);
     }
 
+    // Humidity — avg (outdoor humidity)
+    const hums = pool.map(d => d.humidity).filter(h => typeof h === "number");
+    if (hums.length > 0) {
+      const avgHum = hums.reduce((a, b) => a + b, 0) / hums.length;
+      els.humidity.value = avgHum.toFixed(0);
+    }
+
+    // Barometric pressure — avg (relative/sea-level, inHg). Fallback to absolute.
+    const pressures = pool
+      .map(d => (typeof d.baromrelin === "number" ? d.baromrelin : (typeof d.baromabsin === "number" ? d.baromabsin : null)))
+      .filter(p => typeof p === "number");
+    if (pressures.length > 0) {
+      const avgPressure = pressures.reduce((a, b) => a + b, 0) / pressures.length;
+      els.pressure.value = avgPressure.toFixed(2);
+    }
+
     const label = recent.length > 0
-      ? `Air temp & wind set (avg temp, max wind over last 10 min).`
-      : `Air temp & wind set (most recent reading — no data in last 10 min).`;
+      ? `Weather set: avg temp, max wind, avg humidity & pressure over last 10 min.`
+      : `Weather set from most recent reading (no data in last 10 min).`;
     setStatus(label);
   } catch (e) {
     console.error(e);
@@ -473,6 +631,24 @@ async function fetchAmbientTemp() {
 }
 
 els.btnFetchTemp.addEventListener("click", fetchAmbientTemp);
+
+// Notes button (entry form)
+els.btnNotes.addEventListener("click", openNotesEditor);
+
+// Notes dialog close
+els.notesDialog.addEventListener("close", () => {
+  if (els.notesDialog.returnValue === "ok") {
+    pendingNotes = els.notesInput.value || "";
+    updateNotesButton();
+    const hasNotes = !!(pendingNotes && pendingNotes.trim());
+    setStatus(hasNotes ? "Notes saved to entry." : "Notes cleared.");
+  }
+});
+
+// Pass/Fail clear button
+els.btnClearResult.addEventListener("click", () => {
+  setBurnbackResult("");
+});
 
 // Button wiring
 els.btnSave.addEventListener("click", saveNewEntry);
@@ -511,6 +687,7 @@ window.addEventListener("unhandledrejection", (e) => { console.error(e.reason ||
   setStatus("Starting…");
   renderProject();
   setTodayIfEmpty();
+  updateNotesButton();
 
   let apiOk = true;
   try { await api("/api/ping", { method: "GET" }); }

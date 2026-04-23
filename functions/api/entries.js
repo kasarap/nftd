@@ -1,4 +1,4 @@
-// v4 – Add expansion, drainTime, burnbackTime to persisted fields
+// v5 – Add humidity, pressure, burnbackResult, notes to persisted fields
 export async function onRequest(context) {
   const { request, env } = context;
   const kv = env.APP_KV;
@@ -93,6 +93,8 @@ function normalizeEntry(e) {
     testType: safeStr(e.testType),
     airTemp: safeStr(e.airTemp),
     wind: safeStr(e.wind),
+    humidity: safeStr(e.humidity),
+    pressure: safeStr(e.pressure),
     fuelTemp: safeStr(e.fuelTemp),
     solutionTemp: safeStr(e.solutionTemp),
     expansion: safeStr(e.expansion),
@@ -100,6 +102,8 @@ function normalizeEntry(e) {
     controlTime: safeTime(e.controlTime),
     extinguishmentTime: safeTime(e.extinguishmentTime),
     burnbackTime: safeTime(e.burnbackTime),
+    burnbackResult: safeResult(e.burnbackResult),
+    notes: safeNotes(e.notes),
     savedTime: safeStr(e.savedTime),
   };
 }
@@ -114,6 +118,17 @@ function safeTime(v) {
   if (!s) return "";
   const m = s.match(/^(\d{1,2}):([0-5]\d)$/);
   return m ? `${Number(m[1])}:${m[2]}` : "";
+}
+
+function safeResult(v) {
+  const s = safeStr(v).toLowerCase();
+  return (s === "pass" || s === "fail") ? s : "";
+}
+
+function safeNotes(v) {
+  if (v === null || v === undefined) return "";
+  // Allow multi-line text; cap at 5000 chars to keep KV value reasonable
+  return String(v).slice(0, 5000);
 }
 
 function sanitizeProject(s) {

@@ -55,13 +55,23 @@
           <div class="lbl">Air Temp</div>
           <div class="airTempRow">
             <input id="airTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
-            <button id="btnFetchTemp" class="btn ghost tempBtn" type="button" title="Fetch avg air temp from last 10 min">🌡️</button>
+            <button id="btnFetchTemp" class="btn ghost tempBtn" type="button" title="Fetch air temp, wind, humidity &amp; pressure from last 10 min">🌡️</button>
           </div>
         </div>
 
         <div class="field">
           <div class="lbl">Wind</div>
           <input id="wind" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Humidity</div>
+          <input id="humidity" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Pressure</div>
+          <input id="pressure" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
         </div>
 
         <div class="field">
@@ -99,9 +109,32 @@
           <input id="burnbackTime" type="text" inputmode="numeric" />
         </div>
 
+        <div class="field">
+          <div class="lbl">Burnback Result</div>
+          <div class="passFailRow">
+            <label class="passFailOpt">
+              <input type="radio" name="burnbackResult" id="burnbackPass" value="pass" />
+              <span class="passFailLbl pass">Pass</span>
+            </label>
+            <label class="passFailOpt">
+              <input type="radio" name="burnbackResult" id="burnbackFail" value="fail" />
+              <span class="passFailLbl fail">Fail</span>
+            </label>
+            <button id="btnClearResult" class="linkbtn" type="button" title="Clear pass/fail">×</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="lbl">Notes</div>
+          <button id="btnNotes" class="btn ghost notesBtn" type="button">
+            <span id="notesIndicator" class="notesIndicator" aria-hidden="true"></span>
+            <span id="notesBtnLabel">Add notes</span>
+          </button>
+        </div>
+
         <div class="buttons">
           <button id="btnSave" class="btn primary" type="button">Save</button>
-          <button id="btnEdit" class="btn ghost" type="button" disabled>Edit</button>
+          <button id="btnEdit" class="btn ghost" type="button" disabled>Update</button>
           <button id="btnDeleteTop" class="btn danger ghost" type="button" disabled>Delete</button>
           <button id="btnClear" class="btn ghost" type="button">Clear</button>
         </div>
@@ -113,7 +146,7 @@
             <span class="statusDot" aria-hidden="true"></span>
             <span id="status" class="statusText">Loading…</span>
           </div>
-          <span class="pill">v4</span>
+          <span class="pill">v5</span>
         </div>
       </div>
 
@@ -128,6 +161,8 @@
               <th>Test Type</th>
               <th>Air Temp</th>
               <th>Wind</th>
+              <th>Humidity</th>
+              <th>Pressure</th>
               <th>Fuel Temp</th>
               <th>Solution Temp</th>
               <th>Expansion</th>
@@ -135,6 +170,8 @@
               <th>Control</th>
               <th>Extinguishment</th>
               <th>Burnback</th>
+              <th>Result</th>
+              <th>Notes</th>
               <th class="actionsCol">Actions</th>
             </tr>
           </thead>
@@ -157,6 +194,28 @@
     </form>
   </dialog>
 
-  <script defer src="script.js?v=v4"></script>
+  <dialog id="notesDialog" class="dialog">
+    <form method="dialog" class="dialogCard">
+      <h2 id="notesDialogTitle">Notes</h2>
+      <p id="notesDialogHint">Add any observations or comments for this test.</p>
+      <textarea id="notesInput" rows="6" placeholder="e.g., Slight breeze mid-test, ignition delayed…"></textarea>
+      <div class="dialogBtns">
+        <button class="btn ghost" value="cancel" type="submit">Cancel</button>
+        <button class="btn primary" value="ok" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="notesViewDialog" class="dialog">
+    <form method="dialog" class="dialogCard">
+      <h2>Notes</h2>
+      <pre id="notesViewBody" class="notesView"></pre>
+      <div class="dialogBtns">
+        <button class="btn primary" value="ok" type="submit">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script defer src="script.js?v=v5"></script>
 </body>
 </html>
