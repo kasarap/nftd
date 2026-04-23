@@ -129,7 +129,8 @@ textarea{
 .actionsCol{ width: 170px; }
 .rowActions{ display:flex; gap:4px; }
 .rowActions .btn{ padding:5px 7px; font-size:11px; border-radius:6px; }
-tr.selected td{ background: rgba(26,115,232,.06); }
+.table tbody tr:nth-child(even) td{ background: #f3f6fb; }
+tr.selected td{ background: rgba(26,115,232,.12) !important; }
 
 /* Result cell icons */
 .resultIcon{

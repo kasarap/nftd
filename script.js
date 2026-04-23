@@ -1,5 +1,6 @@
-// v5 – Add: Edit/Copy/Del row actions (edit preserves scroll), Humidity & Pressure fields pulled from Ambient Weather,
-//        Burnback pass/fail with check/X in table, Notes dialog w/ in-table view button.
+// v6 – Zebra-stripe table rows (every other row grey) for readability; selected-row highlight strengthened.
+//      v5: Edit/Copy/Del row actions (edit preserves scroll), Humidity & Pressure fields pulled from Ambient Weather,
+//      Burnback pass/fail with check/X in table, Notes dialog w/ in-table view button.
 window.__appLoaded = true;
 
 const els = {
