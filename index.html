@@ -55,7 +55,7 @@
           <div class="lbl">Air Temp</div>
           <div class="airTempRow">
             <input id="airTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
-            <button id="btnFetchTemp" class="btn ghost tempBtn" type="button" title="Fetch air temp, wind, humidity &amp; pressure from last 10 min">🌡️</button>
+            <button id="btnFetchTemp" class="btn ghost tempBtn" type="button" title="Fetch air temp, wind, humidity, pressure &amp; dew point from last 10 min">🌡️</button>
           </div>
         </div>
 
@@ -72,6 +72,11 @@
         <div class="field">
           <div class="lbl">Pressure</div>
           <input id="pressure" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Dew Point</div>
+          <input id="dewPoint" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
         </div>
 
         <div class="field">
@@ -146,7 +151,7 @@
             <span class="statusDot" aria-hidden="true"></span>
             <span id="status" class="statusText">Loading…</span>
           </div>
-          <span class="pill">v6</span>
+          <span class="pill">v7</span>
         </div>
       </div>
 
@@ -163,6 +168,7 @@
               <th>Wind</th>
               <th>Humidity</th>
               <th>Pressure</th>
+              <th>Dew Point</th>
               <th>Fuel Temp</th>
               <th>Solution Temp</th>
               <th>Expansion</th>
@@ -216,6 +222,6 @@
     </form>
   </dialog>
 
-  <script defer src="script.js?v=v6"></script>
+  <script defer src="script.js?v=v7"></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
-// v6 – Zebra-stripe table rows (every other row grey) for readability; selected-row highlight strengthened.
+// v7 – Added Dew Point field: pulled from Ambient Weather API (dewPoint), included in form/table/CSV export.
+//      v6: Zebra-stripe table rows (every other row grey) for readability; selected-row highlight strengthened.
 //      v5: Edit/Copy/Del row actions (edit preserves scroll), Humidity & Pressure fields pulled from Ambient Weather,
 //      Burnback pass/fail with check/X in table, Notes dialog w/ in-table view button.
 window.__appLoaded = true;
@@ -16,6 +17,7 @@ const els = {
   wind: document.getElementById("wind"),
   humidity: document.getElementById("humidity"),
   pressure: document.getElementById("pressure"),
+  dewPoint: document.getElementById("dewPoint"),
   fuelTemp: document.getElementById("fuelTemp"),
   solutionTemp: document.getElementById("solutionTemp"),
   expansion: document.getElementById("expansion"),
@@ -199,6 +201,7 @@ function getFormData(includeTime = false) {
     wind: els.wind.value || "",
     humidity: els.humidity.value || "",
     pressure: els.pressure.value || "",
+    dewPoint: els.dewPoint.value || "",
     fuelTemp: els.fuelTemp.value || "",
     solutionTemp: els.solutionTemp.value || "",
     expansion: els.expansion.value || "",
@@ -222,6 +225,7 @@ function setFormData(d) {
   els.wind.value = d?.wind || "";
   els.humidity.value = d?.humidity || "";
   els.pressure.value = d?.pressure || "";
+  els.dewPoint.value = d?.dewPoint || "";
   els.fuelTemp.value = d?.fuelTemp || "";
   els.solutionTemp.value = d?.solutionTemp || "";
   els.expansion.value = d?.expansion || "";
@@ -336,6 +340,7 @@ function renderTable(preserveScroll = false) {
       <td>${escapeHtml(e.wind)}</td>
       <td>${escapeHtml(e.humidity)}</td>
       <td>${escapeHtml(e.pressure)}</td>
+      <td>${escapeHtml(e.dewPoint)}</td>
       <td>${escapeHtml(e.fuelTemp)}</td>
       <td>${escapeHtml(e.solutionTemp)}</td>
       <td>${escapeHtml(e.expansion)}</td>
@@ -524,7 +529,7 @@ function csvCell(v) {
 function entriesToCsv(rows) {
   const headers = [
     "Date","Time","Foam","Fuel","Test Type",
-    "Air Temp","Wind","Humidity","Pressure",
+    "Air Temp","Wind","Humidity","Pressure","Dew Point",
     "Fuel Temp","Solution Temp","Expansion",
     "Drain Time","Control","Extinguishment","Burnback","Result","Notes"
   ];
@@ -532,7 +537,7 @@ function entriesToCsv(rows) {
   for (const r of rows) {
     const vals = [
       r.date, r.savedTime||"", r.foam, r.fuel, r.testType,
-      r.airTemp, r.wind, r.humidity||"", r.pressure||"",
+      r.airTemp, r.wind, r.humidity||"", r.pressure||"", r.dewPoint||"",
       r.fuelTemp, r.solutionTemp, r.expansion||"",
       r.drainTime||"", r.controlTime, r.extinguishmentTime, r.burnbackTime||"",
       r.burnbackResult||"", r.notes||""
@@ -619,8 +624,15 @@ async function fetchAmbientTemp() {
       els.pressure.value = avgPressure.toFixed(2);
     }
 
+    // Dew Point — avg (°F)
+    const dewPoints = pool.map(d => d.dewPoint).filter(dp => typeof dp === "number");
+    if (dewPoints.length > 0) {
+      const avgDewPoint = dewPoints.reduce((a, b) => a + b, 0) / dewPoints.length;
+      els.dewPoint.value = avgDewPoint.toFixed(1);
+    }
+
     const label = recent.length > 0
-      ? `Weather set: avg temp, max wind, avg humidity & pressure over last 10 min.`
+      ? `Weather set: avg temp, max wind, avg humidity, pressure & dew point over last 10 min.`
       : `Weather set from most recent reading (no data in last 10 min).`;
     setStatus(label);
   } catch (e) {

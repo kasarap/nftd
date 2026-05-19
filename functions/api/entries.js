@@ -1,3 +1,4 @@
+// v7 – Add dewPoint to persisted fields
 // v5 – Add humidity, pressure, burnbackResult, notes to persisted fields
 export async function onRequest(context) {
   const { request, env } = context;
@@ -95,6 +96,7 @@ function normalizeEntry(e) {
     wind: safeStr(e.wind),
     humidity: safeStr(e.humidity),
     pressure: safeStr(e.pressure),
+    dewPoint: safeStr(e.dewPoint),
     fuelTemp: safeStr(e.fuelTemp),
     solutionTemp: safeStr(e.solutionTemp),
     expansion: safeStr(e.expansion),
