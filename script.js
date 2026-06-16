@@ -1,7 +1,6 @@
-// v7 – Added Dew Point field: pulled from Ambient Weather API (dewPoint), included in form/table/CSV export.
-//      v6: Zebra-stripe table rows (every other row grey) for readability; selected-row highlight strengthened.
-//      v5: Edit/Copy/Del row actions (edit preserves scroll), Humidity & Pressure fields pulled from Ambient Weather,
-//      Burnback pass/fail with check/X in table, Notes dialog w/ in-table view button.
+// v8 – MIL Timer popup: 10s pre-burn → 90s extinguishment countdown → 45s place burnback pot → burnback count-up.
+//      Extinguishment and burnback times logged into form fields on "Log to Entry".
+//      v7: Added Dew Point field: pulled from Ambient Weather API (dewPoint), included in form/table/CSV export.
 window.__appLoaded = true;
 
 const els = {
@@ -37,6 +36,22 @@ const els = {
   btnEdit: document.getElementById("btnEdit"),
   btnDeleteTop: document.getElementById("btnDeleteTop"),
   btnClear: document.getElementById("btnClear"),
+
+  btnTimer: document.getElementById("btnTimer"),
+  timerDialog: document.getElementById("timerDialog"),
+  btnTimerClose: document.getElementById("btnTimerClose"),
+  timerPhaseDots: document.getElementById("timerPhaseDots"),
+  timerPhaseLabel: document.getElementById("timerPhaseLabel"),
+  timerBigTime: document.getElementById("timerBigTime"),
+  timerTotalTime: document.getElementById("timerTotalTime"),
+  timerSubLabel: document.getElementById("timerSubLabel"),
+  timerProgressFill: document.getElementById("timerProgressFill"),
+  timerResults: document.getElementById("timerResults"),
+  timerResultRows: document.getElementById("timerResultRows"),
+  timerMainBtn: document.getElementById("timerMainBtn"),
+  timerAuxBtn: document.getElementById("timerAuxBtn"),
+  btnTimerReset: document.getElementById("btnTimerReset"),
+  btnTimerLog: document.getElementById("btnTimerLog"),
 
   tbody: document.getElementById("tbody"),
   pagination: document.getElementById("pagination"),
@@ -691,6 +706,207 @@ els.syncDialog.addEventListener("close", async () => {
   await refresh();
   setStatus("Sync Name set.");
 });
+
+// ── MIL Timer ────────────────────────────────────────────────────────────────
+const TIMER_PHASES = [
+  { id: "preBurn",  label: "Pre-burn",            sub: "Pre-burn countdown",                      duration: 10,  countUp: false },
+  { id: "control",  label: "Extinguishment",       sub: "Press Extinguishment when fire is out",   duration: 90,  countUp: false },
+  { id: "drain",    label: "Place Burnback Pot",   sub: "45 seconds to place burnback pot",        duration: 45,  countUp: false },
+  { id: "burnback", label: "Burnback",             sub: "Press 25% Burnback when reached",         duration: null,countUp: true  },
+];
+
+let timerPhase = 0;
+let timerPhaseInterval = null;
+let timerTotalInterval = null;
+let timerElapsed = 0;
+let timerTotalElapsed = 0;
+let timerStarted = false;
+let timerExtTime = 0;   // seconds at extinguishment press
+let timerBurnbackTime = 0; // seconds at 25% burnback press
+
+function timerFmt(s) {
+  s = Math.max(0, Math.round(s));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+function timerSetFill(pct, cls) {
+  const fill = els.timerProgressFill;
+  fill.style.width = Math.max(0, Math.min(100, pct)) + "%";
+  fill.className = "timerProgressFill" + (cls ? " " + cls : "");
+}
+
+function timerUpdateDots() {
+  els.timerPhaseDots.innerHTML = TIMER_PHASES.map((p, i) => {
+    const cls = "timerDot" + (i < timerPhase ? " done" : i === timerPhase ? " active" : "");
+    return `<div class="${cls}" title="${p.label}"></div>`;
+  }).join("");
+}
+
+function timerRenderPhase() {
+  const p = TIMER_PHASES[timerPhase];
+  els.timerPhaseLabel.textContent = p.label;
+  els.timerSubLabel.textContent = p.sub;
+  els.timerMainBtn.style.display = "none";
+  els.timerAuxBtn.style.display = "none";
+
+  if (p.id === "preBurn") {
+    els.timerBigTime.textContent = "0:10";
+    timerSetFill(100, "");
+    els.timerMainBtn.style.display = "block";
+    els.timerMainBtn.disabled = false;
+    els.timerMainBtn.textContent = "Start";
+  } else if (p.id === "control") {
+    els.timerBigTime.textContent = "1:30";
+    timerSetFill(100, "");
+    els.timerAuxBtn.style.display = "block";
+    els.timerAuxBtn.textContent = "Extinguishment";
+    els.timerAuxBtn.className = "btn timerActionBtn timerAuxBtn timerAuxSuccess";
+  } else if (p.id === "drain") {
+    els.timerBigTime.textContent = "0:45";
+    timerSetFill(100, "");
+  } else if (p.id === "burnback") {
+    els.timerBigTime.textContent = "0:00";
+    timerSetFill(0, "");
+    els.timerAuxBtn.style.display = "block";
+    els.timerAuxBtn.textContent = "25% Burnback";
+    els.timerAuxBtn.className = "btn ghost timerActionBtn timerAuxBtn";
+  }
+  timerUpdateDots();
+}
+
+function timerStartTotal() {
+  clearInterval(timerTotalInterval);
+  timerTotalInterval = setInterval(() => {
+    timerTotalElapsed += 0.1;
+    els.timerTotalTime.textContent = timerFmt(timerTotalElapsed);
+  }, 100);
+}
+
+function timerRunPhase() {
+  const p = TIMER_PHASES[timerPhase];
+  timerElapsed = 0;
+  clearInterval(timerPhaseInterval);
+
+  timerPhaseInterval = setInterval(() => {
+    timerElapsed += 0.1;
+
+    if (p.id === "preBurn") {
+      const rem = 10 - timerElapsed;
+      els.timerBigTime.textContent = timerFmt(rem);
+      timerSetFill(rem / 10 * 100, rem <= 3 ? "danger" : rem <= 5 ? "warn" : "");
+      if (rem <= 0) { clearInterval(timerPhaseInterval); timerPhaseInterval = null; timerAdvance(); }
+
+    } else if (p.id === "control") {
+      const rem = 90 - timerElapsed;
+      els.timerBigTime.textContent = timerFmt(Math.max(0, rem));
+      timerSetFill(rem / 90 * 100, rem <= 15 ? "danger" : rem <= 30 ? "warn" : "");
+      // user must press Extinguishment — no auto-advance
+
+    } else if (p.id === "drain") {
+      const rem = 45 - timerElapsed;
+      els.timerBigTime.textContent = timerFmt(Math.max(0, rem));
+      timerSetFill(rem / 45 * 100, rem <= 10 ? "danger" : rem <= 15 ? "warn" : "");
+      if (rem <= 0) { clearInterval(timerPhaseInterval); timerPhaseInterval = null; timerAdvance(); }
+
+    } else if (p.id === "burnback") {
+      els.timerBigTime.textContent = timerFmt(timerElapsed);
+      timerSetFill(Math.min(timerElapsed / 240 * 100, 99), "");
+    }
+  }, 100);
+}
+
+function timerAdvance() {
+  timerPhase++;
+  if (timerPhase >= TIMER_PHASES.length) { timerShowComplete(); return; }
+  timerRenderPhase();
+  timerRunPhase();
+}
+
+function timerLogResult(label, val) {
+  els.timerResults.style.display = "block";
+  const row = document.createElement("div");
+  row.className = "timerResultRow";
+  row.innerHTML = `<span>${label}</span><span>${timerFmt(val)}</span>`;
+  els.timerResultRows.appendChild(row);
+}
+
+function timerShowComplete() {
+  clearInterval(timerTotalInterval);
+  els.timerPhaseLabel.textContent = "Test complete";
+  els.timerBigTime.textContent = "✓";
+  els.timerBigTime.style.fontSize = "48px";
+  els.timerSubLabel.textContent = "All phases finished";
+  timerSetFill(100, "");
+  els.timerMainBtn.style.display = "none";
+  els.timerAuxBtn.style.display = "none";
+  els.btnTimerLog.disabled = false;
+  timerUpdateDots();
+}
+
+function timerReset() {
+  clearInterval(timerPhaseInterval); timerPhaseInterval = null;
+  clearInterval(timerTotalInterval); timerTotalInterval = null;
+  timerPhase = 0; timerElapsed = 0; timerTotalElapsed = 0;
+  timerStarted = false; timerExtTime = 0; timerBurnbackTime = 0;
+  els.timerBigTime.style.fontSize = "";
+  els.timerTotalTime.textContent = "0:00";
+  els.timerResults.style.display = "none";
+  els.timerResultRows.innerHTML = "";
+  els.btnTimerLog.disabled = true;
+  timerRenderPhase();
+}
+
+function openTimerDialog() {
+  els.timerDialog.showModal();
+}
+
+// Timer button wiring
+els.btnTimer.addEventListener("click", openTimerDialog);
+
+els.btnTimerClose.addEventListener("click", () => {
+  els.timerDialog.close();
+});
+
+els.timerMainBtn.addEventListener("click", () => {
+  timerStarted = true;
+  els.timerMainBtn.disabled = true;
+  els.timerMainBtn.textContent = "Running…";
+  timerStartTotal();
+  timerRunPhase();
+});
+
+els.timerAuxBtn.addEventListener("click", () => {
+  const p = TIMER_PHASES[timerPhase];
+  if (p.id === "control") {
+    timerExtTime = timerElapsed;
+    clearInterval(timerPhaseInterval); timerPhaseInterval = null;
+    timerLogResult("Extinguishment", timerExtTime);
+    timerAdvance();
+  } else if (p.id === "burnback") {
+    timerBurnbackTime = timerElapsed;
+    clearInterval(timerPhaseInterval); timerPhaseInterval = null;
+    timerLogResult("25% Burnback", timerBurnbackTime);
+    timerAdvance();
+  }
+});
+
+els.btnTimerReset.addEventListener("click", timerReset);
+
+els.btnTimerLog.addEventListener("click", () => {
+  // Write times into form fields using mm:ss format
+  if (timerExtTime > 0) {
+    els.extinguishmentTime.value = timerFmt(timerExtTime);
+  }
+  if (timerBurnbackTime > 0) {
+    els.burnbackTime.value = timerFmt(timerBurnbackTime);
+  }
+  els.timerDialog.close();
+  setStatus("Extinguishment and Burnback times logged to entry.");
+});
+
+// Initialize timer UI
+timerRenderPhase();
+// ── End MIL Timer ─────────────────────────────────────────────────────────────
 
 // Startup
 window.addEventListener("error", (e) => { console.error(e.error || e); setStatus(`JS error: ${e.message || "unknown"}`, true); });

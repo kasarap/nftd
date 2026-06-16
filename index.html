@@ -142,6 +142,7 @@
           <button id="btnEdit" class="btn ghost" type="button" disabled>Update</button>
           <button id="btnDeleteTop" class="btn danger ghost" type="button" disabled>Delete</button>
           <button id="btnClear" class="btn ghost" type="button">Clear</button>
+          <button id="btnTimer" class="btn ghost timerBtn" type="button">⏱ Timer</button>
         </div>
       </div>
 
@@ -151,7 +152,7 @@
             <span class="statusDot" aria-hidden="true"></span>
             <span id="status" class="statusText">Loading…</span>
           </div>
-          <span class="pill">v7</span>
+          <span class="pill">v8</span>
         </div>
       </div>
 
@@ -222,6 +223,43 @@
     </form>
   </dialog>
 
-  <script defer src="script.js?v=v7"></script>
+  <dialog id="timerDialog" class="dialog timerDialogWide">
+    <div class="dialogCard timerDialogCard">
+      <div class="timerDialogHeader">
+        <h2>MIL Timer</h2>
+        <button id="btnTimerClose" class="linkbtn timerCloseBtn" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="timerPhaseDots" id="timerPhaseDots"></div>
+      <p class="timerPhaseLabel" id="timerPhaseLabel">Ready</p>
+
+      <div class="timerMainRow">
+        <div class="timerBigTime" id="timerBigTime">0:10</div>
+        <div class="timerTotalBlock">
+          <div class="timerTotalLabel">Total</div>
+          <div class="timerTotalTime" id="timerTotalTime">0:00</div>
+        </div>
+      </div>
+
+      <p class="timerSubLabel" id="timerSubLabel">Press Start to begin pre-burn</p>
+      <div class="timerProgressBar"><div class="timerProgressFill" id="timerProgressFill" style="width:100%"></div></div>
+
+      <div id="timerResults" style="display:none">
+        <hr class="timerDivider">
+        <div id="timerResultRows"></div>
+        <hr class="timerDivider">
+      </div>
+
+      <button class="btn primary timerActionBtn" id="timerMainBtn" type="button">Start</button>
+      <button class="btn ghost timerActionBtn timerAuxBtn" id="timerAuxBtn" type="button" style="display:none"></button>
+
+      <div class="timerDialogBtns">
+        <button class="btn ghost" id="btnTimerReset" type="button">Reset</button>
+        <button class="btn primary" id="btnTimerLog" type="button" disabled>Log to Entry</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script defer src="script.js?v=v8"></script>
 </body>
 </html>
