@@ -1,3 +1,312 @@
+# TD v8 Codebase Reference
+
+## Version
+v8
+
+## What changed in v8
+- **MIL Timer popup** (`⏱ Timer` button in form): 4-phase sequence:
+  1. Pre-burn: 10s countdown → auto-advance
+  2. Control: 90s count-UP → Extinguishment button logs split time and hides itself, timer keeps counting to 1:30 → auto-advances to drain
+  3. Place Burnback Pot: 45s countdown → auto-advance
+  4. Burnback: count-up → 25% Burnback button logs time → complete
+  "Log to Entry" writes Extinguishment and Burnback times into form fields.
+- **Weather fetch fix**: switched from MAC-specific `/devices/{MAC}?limit=12` to `/devices` (all devices on account), reads `lastData` from matching MAC or first device. Better error messages for 429, 401/403.
+
+## Four versioning touchpoints (update all simultaneously on version bump)
+1. `td-vN.zip` filename
+2. `script.js` header comment (line 1)
+3. Version pill in `index.html` (`<span class="pill">vN</span>`)
+4. Cache-buster in `index.html` (`script.js?v=vN`)
+
+## Field propagation checklist (for any new field addition)
+- [ ] `index.html` — form input element
+- [ ] `script.js` `els` object
+- [ ] `getFormData()`
+- [ ] `setFormData()`
+- [ ] `renderTable()` — table cell
+- [ ] `index.html` — `<th>` table header
+- [ ] `entriesToCsv()` — headers array + values array
+- [ ] `functions/api/entries.js` — `normalizeEntry()`
+- [ ] `functions/api/entries/export.js` — if it has its own normalize
+
+## Critical rules
+- `btnSave` MUST remain in `els` — removing it breaks all button wiring including the sync dialog
+- Backend `normalizeEntry()` must be updated for every new field or it will silently strip data
+
+## Files
+
+### index.html
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Test Entry Log</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="header">
+      <div class="headerLeft">
+        <h1>Test Entry Log</h1>
+        <div class="meta">
+          <span>Sync Name:</span>
+          <span id="projectLabel" class="pill">Not set</span>
+          <button id="btnSetProject" class="linkbtn" type="button">Change</button>
+        </div>
+      </div>
+
+      <div class="headerRight">
+        <button id="btnExportCsv" class="btn ghost" type="button">Export to CSV</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="entryGrid">
+        <div class="field">
+          <div class="lbl">Date</div>
+          <input id="date" type="date" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Foam</div>
+          <input id="foam" type="text" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Fuel</div>
+          <input id="fuel" type="text" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Test Type</div>
+          <select id="testType">
+            <option value="" selected disabled>Test Type</option>
+            <option value="Sprinkler">Sprinkler</option>
+            <option value="Type II">Type II</option>
+            <option value="Type III">Type III</option>
+            <option value="MIL">MIL</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="lbl">Air Temp</div>
+          <div class="airTempRow">
+            <input id="airTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+            <button id="btnFetchTemp" class="btn ghost tempBtn" type="button" title="Fetch air temp, wind, humidity, pressure &amp; dew point from last 10 min">🌡️</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="lbl">Wind</div>
+          <input id="wind" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Humidity</div>
+          <input id="humidity" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Pressure</div>
+          <input id="pressure" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Dew Point</div>
+          <input id="dewPoint" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Fuel Temp</div>
+          <input id="fuelTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Solution Temp</div>
+          <input id="solutionTemp" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Expansion</div>
+          <input id="expansion" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Drain Time</div>
+          <input id="drainTime" type="text" inputmode="numeric" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Control</div>
+          <input id="controlTime" type="text" inputmode="numeric" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Extinguishment</div>
+          <input id="extinguishmentTime" type="text" inputmode="numeric" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Burnback</div>
+          <input id="burnbackTime" type="text" inputmode="numeric" />
+        </div>
+
+        <div class="field">
+          <div class="lbl">Burnback Result</div>
+          <div class="passFailRow">
+            <label class="passFailOpt">
+              <input type="radio" name="burnbackResult" id="burnbackPass" value="pass" />
+              <span class="passFailLbl pass">Pass</span>
+            </label>
+            <label class="passFailOpt">
+              <input type="radio" name="burnbackResult" id="burnbackFail" value="fail" />
+              <span class="passFailLbl fail">Fail</span>
+            </label>
+            <button id="btnClearResult" class="linkbtn" type="button" title="Clear pass/fail">×</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="lbl">Notes</div>
+          <button id="btnNotes" class="btn ghost notesBtn" type="button">
+            <span id="notesIndicator" class="notesIndicator" aria-hidden="true"></span>
+            <span id="notesBtnLabel">Add notes</span>
+          </button>
+        </div>
+
+        <div class="buttons">
+          <button id="btnSave" class="btn primary" type="button">Save</button>
+          <button id="btnEdit" class="btn ghost" type="button" disabled>Update</button>
+          <button id="btnDeleteTop" class="btn danger ghost" type="button" disabled>Delete</button>
+          <button id="btnClear" class="btn ghost" type="button">Clear</button>
+          <button id="btnTimer" class="btn ghost timerBtn" type="button">⏱ Timer</button>
+        </div>
+      </div>
+
+      <div id="statusBar" class="statusBar" data-error="0">
+        <div class="statusBarInner">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="statusDot" aria-hidden="true"></span>
+            <span id="status" class="statusText">Loading…</span>
+          </div>
+          <span class="pill">v8</span>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Foam</th>
+              <th>Fuel</th>
+              <th>Test Type</th>
+              <th>Air Temp</th>
+              <th>Wind</th>
+              <th>Humidity</th>
+              <th>Pressure</th>
+              <th>Dew Point</th>
+              <th>Fuel Temp</th>
+              <th>Solution Temp</th>
+              <th>Expansion</th>
+              <th>Drain Time</th>
+              <th>Control</th>
+              <th>Extinguishment</th>
+              <th>Burnback</th>
+              <th>Result</th>
+              <th>Notes</th>
+              <th class="actionsCol">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination" class="pagination"></div>
+    </section>
+  </main>
+
+  <dialog id="syncDialog" class="dialog">
+    <form method="dialog" class="dialogCard">
+      <h2>Set Sync Name</h2>
+      <p>This name is used to sync entries across devices.</p>
+      <input id="syncNameInput" type="text" placeholder="e.g., JLC219AN Jan 21" autocomplete="off" />
+      <div class="dialogBtns">
+        <button class="btn ghost" value="cancel" type="submit">Cancel</button>
+        <button class="btn primary" value="ok" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="notesDialog" class="dialog">
+    <form method="dialog" class="dialogCard">
+      <h2 id="notesDialogTitle">Notes</h2>
+      <p id="notesDialogHint">Add any observations or comments for this test.</p>
+      <textarea id="notesInput" rows="6" placeholder="e.g., Slight breeze mid-test, ignition delayed…"></textarea>
+      <div class="dialogBtns">
+        <button class="btn ghost" value="cancel" type="submit">Cancel</button>
+        <button class="btn primary" value="ok" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="notesViewDialog" class="dialog">
+    <form method="dialog" class="dialogCard">
+      <h2>Notes</h2>
+      <pre id="notesViewBody" class="notesView"></pre>
+      <div class="dialogBtns">
+        <button class="btn primary" value="ok" type="submit">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="timerDialog" class="dialog timerDialogWide">
+    <div class="dialogCard timerDialogCard">
+      <div class="timerDialogHeader">
+        <h2>MIL Timer</h2>
+        <button id="btnTimerClose" class="linkbtn timerCloseBtn" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="timerPhaseDots" id="timerPhaseDots"></div>
+      <p class="timerPhaseLabel" id="timerPhaseLabel">Ready</p>
+
+      <div class="timerMainRow">
+        <div class="timerBigTime" id="timerBigTime">0:10</div>
+        <div class="timerTotalBlock">
+          <div class="timerTotalLabel">Total</div>
+          <div class="timerTotalTime" id="timerTotalTime">0:00</div>
+        </div>
+      </div>
+
+      <p class="timerSubLabel" id="timerSubLabel">Press Start to begin pre-burn</p>
+      <div class="timerProgressBar"><div class="timerProgressFill" id="timerProgressFill" style="width:100%"></div></div>
+
+      <div id="timerResults" style="display:none">
+        <hr class="timerDivider">
+        <div id="timerResultRows"></div>
+        <hr class="timerDivider">
+      </div>
+
+      <button class="btn primary timerActionBtn" id="timerMainBtn" type="button">Start</button>
+      <button class="btn ghost timerActionBtn timerAuxBtn" id="timerAuxBtn" type="button" style="display:none"></button>
+
+      <div class="timerDialogBtns">
+        <button class="btn ghost" id="btnTimerReset" type="button">Reset</button>
+        <button class="btn primary" id="btnTimerLog" type="button" disabled>Log to Entry</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script defer src="script.js?v=v8"></script>
+</body>
+</html>
+```
+-e 
+### script.js
+
+```js
 // v8 – MIL Timer popup: 10s pre-burn → 90s extinguishment countdown → 45s place burnback pot → burnback count-up.
 //      Extinguishment and burnback times logged into form fields on "Log to Entry".
 //      v7: Added Dew Point field: pulled from Ambient Weather API (dewPoint), included in form/table/CSV export.
@@ -912,3 +1221,504 @@ window.addEventListener("unhandledrejection", (e) => { console.error(e.reason ||
     }
   }
 })();
+```
+-e 
+### styles.css
+
+```css
+:root{
+  --bg:#f7f9fc;
+  --card:#ffffff;
+  --border:#d9e2ef;
+  --text:#111827;
+  --muted:#4b5563;
+  --accent:#1a73e8;
+  --accent2:#1558b0;
+  --danger:#d93025;
+  --success:#137333;
+  --shadow: 0 10px 28px rgba(17,24,39,.10);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+*{ box-sizing:border-box; }
+body{ margin:0; background:var(--bg); color:var(--text); }
+.wrap{ width:min(1600px, calc(100vw - 24px)); margin:12px auto; }
+
+.header{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
+.headerLeft{ display:grid; gap:4px; }
+.header h1{ margin:0; font-size:20px; letter-spacing:.2px; }
+.meta{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+
+.pill{ display:inline-block; padding:3px 8px; border:1px solid var(--border); border-radius:999px; background:var(--card); font-size:11px; }
+.linkbtn{ border:none; background:transparent; color:var(--accent); cursor:pointer; padding:0; font-size:12px; }
+
+.card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; box-shadow:var(--shadow); }
+
+.entryGrid{
+  display:grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap:8px;
+  align-items:end;
+}
+
+.field{ display:grid; gap:4px; min-width:0; }
+.lbl{ font-size:11px; color:var(--muted); font-weight:500; }
+
+input, select, textarea{
+  width:100%;
+  font-size:15px;
+  padding:8px 10px;
+  border:1px solid #c9d6ea;
+  border-radius:8px;
+  outline:none;
+  background:#fff;
+  min-width:0;
+  -webkit-appearance:none;
+  appearance:none;
+  font-family: inherit;
+}
+input:focus, select:focus, textarea:focus{ border-color: rgba(26,115,232,.55); box-shadow: 0 0 0 3px rgba(26,115,232,.12); }
+
+.buttons{ display:grid; grid-template-columns: 1fr 1fr; gap:6px; align-self:end; }
+
+.btn{
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid #c9d6ea;
+  background:#fff;
+  color:var(--text);
+  cursor:pointer;
+  font-size:13px;
+  line-height:1;
+  user-select:none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.primary:hover{ background:var(--accent2); border-color:var(--accent2); }
+.btn.ghost{ background:#fff; }
+.btn.danger{ border-color: rgba(217,48,37,.25); color: var(--danger); }
+.btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+/* Pass/Fail radio row */
+.passFailRow{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  height: 38px;
+  padding: 0 2px;
+}
+.passFailOpt{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  cursor:pointer;
+  font-size:13px;
+}
+.passFailOpt input[type="radio"]{
+  width:auto;
+  margin:0;
+  padding:0;
+  accent-color: var(--accent);
+}
+.passFailLbl{ font-weight:500; }
+.passFailLbl.pass{ color: var(--success); }
+.passFailLbl.fail{ color: var(--danger); }
+#btnClearResult{ margin-left:auto; font-size:16px; line-height:1; color:var(--muted); padding:2px 6px; }
+
+/* Notes button with indicator dot */
+.notesBtn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:100%;
+  height: 38px;
+}
+.notesIndicator{
+  width:8px; height:8px; border-radius:999px;
+  background: transparent;
+  flex-shrink:0;
+  transition: background .15s;
+}
+.notesBtn.hasNotes .notesIndicator{ background: var(--accent); }
+.notesBtn.hasNotes{ border-color: var(--accent); }
+
+textarea{
+  min-height: 120px;
+  resize: vertical;
+  font-size:14px;
+  line-height:1.4;
+}
+
+.tableWrap{ margin-top:10px; overflow-x:auto; border-radius:10px; border:1px solid var(--border); -webkit-overflow-scrolling:touch; }
+.table{ width:100%; border-collapse:collapse; min-width: 1500px; }
+.table th,.table td{ border-bottom:1px solid #edf1f7; padding:7px 8px; font-size:12px; white-space:nowrap; }
+.table th{ text-align:left; color:var(--muted); background:#f8fafc; position:sticky; top:0; z-index:1; font-size:11px; text-transform:uppercase; letter-spacing:.4px; }
+.actionsCol{ width: 170px; }
+.rowActions{ display:flex; gap:4px; }
+.rowActions .btn{ padding:5px 7px; font-size:11px; border-radius:6px; }
+.table tbody tr:nth-child(even) td{ background: #f3f6fb; }
+tr.selected td{ background: rgba(26,115,232,.12) !important; }
+
+/* Result cell icons */
+.resultIcon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:22px; height:22px;
+  border-radius:999px;
+  font-weight:700;
+  font-size:14px;
+  line-height:1;
+}
+.resultIcon.pass{
+  background: rgba(19,115,51,.12);
+  color: var(--success);
+}
+.resultIcon.fail{
+  background: rgba(217,48,37,.12);
+  color: var(--danger);
+}
+
+/* Notes cell button */
+.notesCellBtn{
+  padding:4px 8px;
+  font-size:11px;
+  border-radius:6px;
+  border:1px solid var(--border);
+  background:#fff;
+  cursor:pointer;
+}
+.notesCellBtn.hasNotes{
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight:500;
+}
+.notesCellEmpty{
+  color: #9aa4b2;
+  font-size:11px;
+}
+
+.notesView{
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+/* Pagination */
+.pagination{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:8px 4px 4px;
+}
+.pagInfo{ font-size:12px; color:var(--muted); }
+.pagBtn{ padding:6px 14px; font-size:13px; }
+
+/* Always-visible status */
+.statusBar{
+  position: sticky;
+  bottom: 0;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.statusBarInner{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; color:var(--muted); }
+.statusDot{ width:8px; height:8px; border-radius:999px; background: rgba(26,115,232,.55); flex-shrink:0; }
+.statusBar[data-error="1"] .statusDot{ background: rgba(217,48,37,.75); }
+.statusBar[data-error="1"] .statusText{ color: var(--danger); }
+
+/* Ambient Weather temp fetch */
+.airTempRow{ display:flex; gap:4px; align-items:center; }
+.airTempRow input{ flex:1; min-width:0; }
+.tempBtn{ padding:8px 9px; font-size:14px; flex-shrink:0; border-radius:8px; }
+.dialog{ border:none; padding:0; background:transparent; }
+.dialog::backdrop{ background: rgba(17,24,39,.45); }
+.dialogCard{
+  width:min(520px, calc(100vw - 24px));
+  border-radius:14px;
+  border:1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding:14px;
+}
+.dialogCard h2{ margin:0 0 6px; font-size:17px; }
+.dialogCard p{ margin:0 0 10px; color:var(--muted); font-size:12px; }
+.dialogBtns{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; }
+
+@media (max-width: 1100px){
+  .entryGrid{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .buttons{ grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 700px){
+  .entryGrid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wrap{ width:calc(100vw - 16px); margin:8px auto; }
+  .header{ flex-direction:column; align-items:flex-start; gap:6px; }
+  .header h1{ font-size:18px; }
+  .buttons{ grid-template-columns: 1fr 1fr; }
+  .table{ min-width: 1300px; }
+  input, select, textarea{ font-size:16px; padding:9px 10px; }
+  .btn{ font-size:14px; padding:10px 10px; }
+  .card{ padding:8px; border-radius:10px; }
+}
+
+/* ── MIL Timer Dialog ───────────────────────────────────────────────────── */
+.timerDialogWide{ max-width:440px; width:calc(100vw - 32px); border-radius:14px; border:none; padding:0; box-shadow:0 8px 40px rgba(0,0,0,.18); }
+.timerDialogCard{ padding:20px 20px 16px; display:flex; flex-direction:column; gap:0; }
+.timerDialogHeader{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.timerDialogHeader h2{ margin:0; font-size:17px; }
+.timerCloseBtn{ font-size:16px; color:var(--muted); padding:2px 6px; }
+
+.timerPhaseDots{ display:flex; gap:8px; margin-bottom:12px; }
+.timerDot{ width:10px; height:10px; border-radius:50%; background:#d0d0d0; }
+.timerDot.done{ background:#22a06b; }
+.timerDot.active{ background:#0969da; }
+
+.timerPhaseLabel{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+
+.timerMainRow{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:2px; }
+.timerBigTime{ font-size:60px; font-weight:500; letter-spacing:-2px; line-height:1; font-variant-numeric:tabular-nums; }
+.timerTotalBlock{ text-align:right; }
+.timerTotalLabel{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+.timerTotalTime{ font-size:26px; font-weight:400; color:var(--muted); font-variant-numeric:tabular-nums; line-height:1; }
+
+.timerSubLabel{ font-size:12px; color:var(--muted); margin:4px 0 12px; min-height:16px; }
+
+.timerProgressBar{ width:100%; height:6px; background:#e0e0e0; border-radius:3px; margin-bottom:14px; overflow:hidden; }
+.timerProgressFill{ height:100%; border-radius:3px; background:#0969da; transition:width .1s linear; }
+.timerProgressFill.warn{ background:#ef9f27; }
+.timerProgressFill.danger{ background:#e24b4a; }
+
+.timerActionBtn{ width:100%; padding:14px; font-size:15px; font-weight:500; margin-bottom:8px; border-radius:8px; }
+.timerAuxSuccess{ background:#d4f7e7 !important; border-color:#22a06b !important; color:#1a6b47 !important; font-size:17px !important; padding:18px !important; }
+
+.timerResultRow{ display:flex; justify-content:space-between; font-size:13px; color:var(--muted); padding:3px 0; }
+.timerResultRow span:last-child{ font-weight:600; color:var(--fg); font-variant-numeric:tabular-nums; }
+.timerDivider{ border:none; border-top:1px solid #eee; margin:8px 0; }
+
+.timerDialogBtns{ display:flex; gap:10px; justify-content:flex-end; margin-top:4px; }
+
+.timerBtn{ display:flex; align-items:center; gap:4px; }
+```
+-e 
+### functions/api/entries.js
+
+```js
+// v7 – Add dewPoint to persisted fields
+// v5 – Add humidity, pressure, burnbackResult, notes to persisted fields
+export async function onRequest(context) {
+  const { request, env } = context;
+  const kv = env.APP_KV;
+  if (!kv) return json({ error: "Missing KV binding APP_KV" }, 500);
+
+  const url = new URL(request.url);
+  const method = request.method.toUpperCase();
+
+  // /api/entries  (CRUD)
+  const projectRaw = url.searchParams.get("project");
+  const project = sanitizeProject(projectRaw);
+  if (!project) return json({ error: "Missing or invalid project" }, 400);
+
+  const key = `entries:${project}`;
+
+  if (method === "GET") {
+    const data = await readProject(kv, key);
+    data.entries.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    return json({ project, entries: data.entries });
+  }
+
+  if (method === "POST") {
+    const body = await request.json().catch(() => null);
+    const entry = body?.entry;
+    if (!entry) return json({ error: "Missing entry" }, 400);
+
+    const data = await readProject(kv, key);
+    const now = new Date().toISOString();
+
+    const newEntry = {
+      id: crypto.randomUUID(),
+      createdAt: now,
+      updatedAt: now,
+      ...normalizeEntry(entry),
+    };
+
+    data.entries.push(newEntry);
+    await kv.put(key, JSON.stringify(data));
+    return json({ ok: true, entry: newEntry });
+  }
+
+  if (method === "PUT") {
+    const id = url.searchParams.get("id");
+    if (!id) return json({ error: "Missing id" }, 400);
+
+    const body = await request.json().catch(() => null);
+    const entry = body?.entry;
+    if (!entry) return json({ error: "Missing entry" }, 400);
+
+    const data = await readProject(kv, key);
+    const idx = data.entries.findIndex(e => e.id === id);
+    if (idx < 0) return json({ error: "Not found" }, 404);
+
+    data.entries[idx] = {
+      ...data.entries[idx],
+      ...normalizeEntry(entry),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await kv.put(key, JSON.stringify(data));
+    return json({ ok: true, entry: data.entries[idx] });
+  }
+
+  if (method === "DELETE") {
+    const id = url.searchParams.get("id");
+    if (!id) return json({ error: "Missing id" }, 400);
+
+    const data = await readProject(kv, key);
+    const before = data.entries.length;
+    data.entries = data.entries.filter(e => e.id !== id);
+
+    if (data.entries.length === before) return json({ error: "Not found" }, 404);
+
+    await kv.put(key, JSON.stringify(data));
+    return json({ ok: true, id });
+  }
+
+  return json({ error: "Method not allowed" }, 405);
+}
+
+async function readProject(kv, key) {
+  const raw = await kv.get(key, { type: "json" });
+  if (raw && typeof raw === "object" && Array.isArray(raw.entries)) return raw;
+  return { entries: [] };
+}
+
+function normalizeEntry(e) {
+  return {
+    date: safeStr(e.date),
+    foam: safeStr(e.foam),
+    fuel: safeStr(e.fuel),
+    testType: safeStr(e.testType),
+    airTemp: safeStr(e.airTemp),
+    wind: safeStr(e.wind),
+    humidity: safeStr(e.humidity),
+    pressure: safeStr(e.pressure),
+    dewPoint: safeStr(e.dewPoint),
+    fuelTemp: safeStr(e.fuelTemp),
+    solutionTemp: safeStr(e.solutionTemp),
+    expansion: safeStr(e.expansion),
+    drainTime: safeTime(e.drainTime),
+    controlTime: safeTime(e.controlTime),
+    extinguishmentTime: safeTime(e.extinguishmentTime),
+    burnbackTime: safeTime(e.burnbackTime),
+    burnbackResult: safeResult(e.burnbackResult),
+    notes: safeNotes(e.notes),
+    savedTime: safeStr(e.savedTime),
+  };
+}
+
+function safeStr(v) {
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
+}
+
+function safeTime(v) {
+  const s = safeStr(v);
+  if (!s) return "";
+  const m = s.match(/^(\d{1,2}):([0-5]\d)$/);
+  return m ? `${Number(m[1])}:${m[2]}` : "";
+}
+
+function safeResult(v) {
+  const s = safeStr(v).toLowerCase();
+  return (s === "pass" || s === "fail") ? s : "";
+}
+
+function safeNotes(v) {
+  if (v === null || v === undefined) return "";
+  // Allow multi-line text; cap at 5000 chars to keep KV value reasonable
+  return String(v).slice(0, 5000);
+}
+
+function sanitizeProject(s) {
+  if (!s) return "";
+  const out = String(s).trim().replace(/\s+/g, " ").slice(0, 80);
+  if (!out || out.length < 2) return "";
+  return out.replace(/[^\w .\-]/g, "");
+}
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+```
+-e 
+### functions/api/entries/export.js
+
+```js
+// Rev 7 – Dedicated export route: /api/entries/export
+export async function onRequest(context) {
+  const { request, env } = context;
+  const kv = env.APP_KV;
+  if (!kv) return json({ error: "Missing KV binding APP_KV" }, 500);
+
+  if (request.method.toUpperCase() !== "GET") {
+    return json({ error: "Method not allowed" }, 405);
+  }
+
+  const url = new URL(request.url);
+  const projectRaw = url.searchParams.get("project");
+  const project = sanitizeProject(projectRaw);
+  if (!project) return json({ error: "Missing or invalid project" }, 400);
+
+  const key = `entries:${project}`;
+  const raw = await kv.get(key, { type: "json" });
+  const data = (raw && typeof raw === "object" && Array.isArray(raw.entries)) ? raw : { entries: [] };
+
+  data.entries.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  return json({ project, exportedAt: new Date().toISOString(), entries: data.entries });
+}
+
+function sanitizeProject(s) {
+  if (!s) return "";
+  const out = String(s).trim().replace(/\s+/g, " ").slice(0, 80);
+  if (!out || out.length < 2) return "";
+  return out.replace(/[^\w .\-]/g, "");
+}
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+```
+-e 
+### functions/api/ping.js
+
+```js
+export async function onRequest() {
+  return new Response(JSON.stringify({ ok: true, ts: new Date().toISOString() }), {
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+```
