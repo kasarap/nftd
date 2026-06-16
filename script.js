@@ -595,6 +595,8 @@ async function fetchAmbientTemp() {
     const url = `https://rt.ambientweather.net/v1/devices/${encodeURIComponent(AW_MAC)}` +
       `?apiKey=${AW_API_KEY}&applicationKey=${AW_APP_KEY}&limit=12`;
     const res = await fetch(url);
+    if (res.status === 429) throw new Error("Rate limited by Ambient Weather — wait 1 min and try again.");
+    if (res.status === 401 || res.status === 403) throw new Error("Ambient Weather API key rejected (401/403). Check keys.");
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
       throw new Error(`Ambient Weather API error ${res.status}: ${txt.slice(0, 120)}`);
@@ -708,21 +710,30 @@ els.syncDialog.addEventListener("close", async () => {
 });
 
 // ── MIL Timer ────────────────────────────────────────────────────────────────
+// Sequence:
+//   Phase 0 – preBurn  : 10s countdown → auto-advance
+//   Phase 1 – control  : 90s COUNT-UP → Extinguishment button logs time, auto-advance to drain
+//   Phase 2 – drain    : 45s countdown → auto-advance
+//   Phase 3 – burnback : count up → 25% Burnback button logs time, complete
+//
+// The 90s control window keeps counting after Extinguishment is pressed;
+// it just logs the split and immediately chains to drain automatically.
+
 const TIMER_PHASES = [
-  { id: "preBurn",  label: "Pre-burn",            sub: "Pre-burn countdown",                      duration: 10,  countUp: false },
-  { id: "control",  label: "Extinguishment",       sub: "Press Extinguishment when fire is out",   duration: 90,  countUp: false },
-  { id: "drain",    label: "Place Burnback Pot",   sub: "45 seconds to place burnback pot",        duration: 45,  countUp: false },
-  { id: "burnback", label: "Burnback",             sub: "Press 25% Burnback when reached",         duration: null,countUp: true  },
+  { id: "preBurn",  label: "Pre-burn",          sub: "Pre-burn countdown"                       },
+  { id: "control",  label: "Control",            sub: "Press Extinguishment when fire is out"    },
+  { id: "drain",    label: "Place Burnback Pot", sub: "45 seconds to place burnback pot"         },
+  { id: "burnback", label: "Burnback",           sub: "Press 25% Burnback when reached"          },
 ];
 
 let timerPhase = 0;
 let timerPhaseInterval = null;
 let timerTotalInterval = null;
-let timerElapsed = 0;
-let timerTotalElapsed = 0;
+let timerElapsed = 0;       // seconds in current phase
+let timerTotalElapsed = 0;  // total test seconds
+let timerExtTime = 0;       // logged extinguishment time
+let timerBurnbackTime = 0;  // logged burnback time
 let timerStarted = false;
-let timerExtTime = 0;   // seconds at extinguishment press
-let timerBurnbackTime = 0; // seconds at 25% burnback press
 
 function timerFmt(s) {
   s = Math.max(0, Math.round(s));
@@ -756,8 +767,8 @@ function timerRenderPhase() {
     els.timerMainBtn.disabled = false;
     els.timerMainBtn.textContent = "Start";
   } else if (p.id === "control") {
-    els.timerBigTime.textContent = "1:30";
-    timerSetFill(100, "");
+    els.timerBigTime.textContent = "0:00";
+    timerSetFill(0, "");
     els.timerAuxBtn.style.display = "block";
     els.timerAuxBtn.textContent = "Extinguishment";
     els.timerAuxBtn.className = "btn timerActionBtn timerAuxBtn timerAuxSuccess";
@@ -797,10 +808,10 @@ function timerRunPhase() {
       if (rem <= 0) { clearInterval(timerPhaseInterval); timerPhaseInterval = null; timerAdvance(); }
 
     } else if (p.id === "control") {
-      const rem = 90 - timerElapsed;
-      els.timerBigTime.textContent = timerFmt(Math.max(0, rem));
-      timerSetFill(rem / 90 * 100, rem <= 15 ? "danger" : rem <= 30 ? "warn" : "");
-      // user must press Extinguishment — no auto-advance
+      // count UP — no auto-advance, user presses Extinguishment
+      els.timerBigTime.textContent = timerFmt(timerElapsed);
+      timerSetFill(Math.min(timerElapsed / 90 * 100, 99),
+        timerElapsed >= 75 ? "danger" : timerElapsed >= 60 ? "warn" : "");
 
     } else if (p.id === "drain") {
       const rem = 45 - timerElapsed;
@@ -809,6 +820,7 @@ function timerRunPhase() {
       if (rem <= 0) { clearInterval(timerPhaseInterval); timerPhaseInterval = null; timerAdvance(); }
 
     } else if (p.id === "burnback") {
+      // count UP — user presses 25% Burnback
       els.timerBigTime.textContent = timerFmt(timerElapsed);
       timerSetFill(Math.min(timerElapsed / 240 * 100, 99), "");
     }
@@ -856,16 +868,9 @@ function timerReset() {
   timerRenderPhase();
 }
 
-function openTimerDialog() {
-  els.timerDialog.showModal();
-}
-
 // Timer button wiring
-els.btnTimer.addEventListener("click", openTimerDialog);
-
-els.btnTimerClose.addEventListener("click", () => {
-  els.timerDialog.close();
-});
+els.btnTimer.addEventListener("click", () => els.timerDialog.showModal());
+els.btnTimerClose.addEventListener("click", () => els.timerDialog.close());
 
 els.timerMainBtn.addEventListener("click", () => {
   timerStarted = true;
@@ -878,6 +883,7 @@ els.timerMainBtn.addEventListener("click", () => {
 els.timerAuxBtn.addEventListener("click", () => {
   const p = TIMER_PHASES[timerPhase];
   if (p.id === "control") {
+    // Log extinguishment time, then immediately chain to drain (timer keeps running in total)
     timerExtTime = timerElapsed;
     clearInterval(timerPhaseInterval); timerPhaseInterval = null;
     timerLogResult("Extinguishment", timerExtTime);
@@ -893,13 +899,8 @@ els.timerAuxBtn.addEventListener("click", () => {
 els.btnTimerReset.addEventListener("click", timerReset);
 
 els.btnTimerLog.addEventListener("click", () => {
-  // Write times into form fields using mm:ss format
-  if (timerExtTime > 0) {
-    els.extinguishmentTime.value = timerFmt(timerExtTime);
-  }
-  if (timerBurnbackTime > 0) {
-    els.burnbackTime.value = timerFmt(timerBurnbackTime);
-  }
+  if (timerExtTime > 0)      els.extinguishmentTime.value = timerFmt(timerExtTime);
+  if (timerBurnbackTime > 0) els.burnbackTime.value       = timerFmt(timerBurnbackTime);
   els.timerDialog.close();
   setStatus("Extinguishment and Burnback times logged to entry.");
 });
