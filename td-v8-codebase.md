@@ -10,6 +10,7 @@ v8
   3. Place Burnback Pot: 45s countdown → auto-advance
   4. Burnback: count-up → 25% Burnback button logs time → complete
   "Log to Entry" writes Extinguishment and Burnback times into form fields.
+- **MIL fuel buttons**: when Test Type = MIL, the Fuel text input (`#fuel`, still the stored value) is hidden and replaced by `#fuelBtns` (Unld 1, Unld 2, Jet 1, Jet 2). Driven by `syncFuelUI()` (called from `setFormData()`, `copyEntry()`, and the `testType` change listener). Switching to MIL clears any fuel not matching `^(Unld|Jet) [12]$`. No backend/CSV changes — value is still `fuel`.
 - **Weather fetch fix**: switched from MAC-specific `/devices/{MAC}?limit=12` to `/devices` (all devices on account), reads `lastData` from matching MAC or first device. Better error messages for 429, 401/403.
 
 ## Four versioning touchpoints (update all simultaneously on version bump)
@@ -77,6 +78,12 @@ v8
         <div class="field">
           <div class="lbl">Fuel</div>
           <input id="fuel" type="text" />
+          <div id="fuelBtns" class="fuelBtns" hidden>
+            <button type="button" class="btn ghost fuelBtn" data-fuel="Unld 1">Unld 1</button>
+            <button type="button" class="btn ghost fuelBtn" data-fuel="Unld 2">Unld 2</button>
+            <button type="button" class="btn ghost fuelBtn" data-fuel="Jet 1">Jet 1</button>
+            <button type="button" class="btn ghost fuelBtn" data-fuel="Jet 2">Jet 2</button>
+          </div>
         </div>
 
         <div class="field">
@@ -560,6 +567,17 @@ function setFormData(d) {
   setBurnbackResult(d?.burnbackResult || "");
   pendingNotes = d?.notes || "";
   updateNotesButton();
+  syncFuelUI();
+}
+
+// MIL tests: replace the free-text Fuel input with Unld 1/2, Jet 1/2 buttons
+function syncFuelUI() {
+  const mil = els.testType.value === "MIL";
+  const btns = document.getElementById("fuelBtns");
+  els.fuel.hidden = mil;
+  btns.hidden = !mil;
+  btns.querySelectorAll(".fuelBtn").forEach(b =>
+    b.classList.toggle("active", b.dataset.fuel === els.fuel.value));
 }
 
 function clearForm() {
@@ -575,6 +593,7 @@ function copyEntry(sourceEntry) {
   els.foam.value = sourceEntry?.foam || "";
   els.testType.value = sourceEntry?.testType || "";
   els.solutionTemp.value = sourceEntry?.solutionTemp || "";
+  syncFuelUI();
   // Ensure we're creating a new entry, not editing
   selectRow(null);
   setStatus("Copied Foam, Test Type, and Solution Temp. Ready for new entry.");
@@ -948,6 +967,17 @@ async function fetchAmbientTemp() {
 }
 
 els.btnFetchTemp.addEventListener("click", fetchAmbientTemp);
+els.testType.addEventListener("change", () => {
+  // Drop a free-text fuel that isn't one of the MIL buttons
+  if (els.testType.value === "MIL" && !/^(Unld|Jet) [12]$/.test(els.fuel.value)) els.fuel.value = "";
+  syncFuelUI();
+});
+document.getElementById("fuelBtns").addEventListener("click", (ev) => {
+  const b = ev.target.closest(".fuelBtn");
+  if (!b) return;
+  els.fuel.value = b.dataset.fuel;
+  syncFuelUI();
+});
 
 // Notes button (entry form)
 els.btnNotes.addEventListener("click", openNotesEditor);
@@ -1296,6 +1326,10 @@ input:focus, select:focus, textarea:focus{ border-color: rgba(26,115,232,.55); b
 .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
 .btn.primary:hover{ background:var(--accent2); border-color:var(--accent2); }
 .btn.ghost{ background:#fff; }
+.fuelBtns[hidden], #fuel[hidden]{ display:none; }
+.fuelBtns{ display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.fuelBtn{ padding:6px 4px; }
+.fuelBtn.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
 .btn.danger{ border-color: rgba(217,48,37,.25); color: var(--danger); }
 .btn:disabled{ opacity:.45; cursor:not-allowed; }
 
