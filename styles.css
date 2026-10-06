@@ -68,6 +68,10 @@ input:focus, select:focus, textarea:focus{ border-color: rgba(26,115,232,.55); b
 .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
 .btn.primary:hover{ background:var(--accent2); border-color:var(--accent2); }
 .btn.ghost{ background:#fff; }
+.fuelBtns[hidden], #fuel[hidden]{ display:none; }
+.fuelBtns{ display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.fuelBtn{ padding:6px 4px; }
+.fuelBtn.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
 .btn.danger{ border-color: rgba(217,48,37,.25); color: var(--danger); }
 .btn:disabled{ opacity:.45; cursor:not-allowed; }
 

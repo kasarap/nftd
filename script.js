@@ -251,6 +251,17 @@ function setFormData(d) {
   setBurnbackResult(d?.burnbackResult || "");
   pendingNotes = d?.notes || "";
   updateNotesButton();
+  syncFuelUI();
+}
+
+// MIL tests: replace the free-text Fuel input with Unld 1/2, Jet 1/2 buttons
+function syncFuelUI() {
+  const mil = els.testType.value === "MIL";
+  const btns = document.getElementById("fuelBtns");
+  els.fuel.hidden = mil;
+  btns.hidden = !mil;
+  btns.querySelectorAll(".fuelBtn").forEach(b =>
+    b.classList.toggle("active", b.dataset.fuel === els.fuel.value));
 }
 
 function clearForm() {
@@ -266,6 +277,7 @@ function copyEntry(sourceEntry) {
   els.foam.value = sourceEntry?.foam || "";
   els.testType.value = sourceEntry?.testType || "";
   els.solutionTemp.value = sourceEntry?.solutionTemp || "";
+  syncFuelUI();
   // Ensure we're creating a new entry, not editing
   selectRow(null);
   setStatus("Copied Foam, Test Type, and Solution Temp. Ready for new entry.");
@@ -639,6 +651,17 @@ async function fetchAmbientTemp() {
 }
 
 els.btnFetchTemp.addEventListener("click", fetchAmbientTemp);
+els.testType.addEventListener("change", () => {
+  // Drop a free-text fuel that isn't one of the MIL buttons
+  if (els.testType.value === "MIL" && !/^(Unld|Jet) [12]$/.test(els.fuel.value)) els.fuel.value = "";
+  syncFuelUI();
+});
+document.getElementById("fuelBtns").addEventListener("click", (ev) => {
+  const b = ev.target.closest(".fuelBtn");
+  if (!b) return;
+  els.fuel.value = b.dataset.fuel;
+  syncFuelUI();
+});
 
 // Notes button (entry form)
 els.btnNotes.addEventListener("click", openNotesEditor);
